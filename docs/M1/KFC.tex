@@ -76,7 +76,7 @@ Roblox is a trend-driven game platform with a very young audience (mostly 10--15
     \item \emph{Model and data health}: model accuracy compared with simple baselines, data freshness and API errors.
   \end{itemize}
   \item \textbf{Data platform} in a lambda architecture, run locally with \texttt{docker compose up}.
-  \item \textbf{ML models:} a model that estimates how many players a game should have (the ratio of actual to expected players is the trend score) and a simple linear projection for the short term.
+  \item \textbf{ML models:} a model that estimates how many players a game should have (the ratio of actual to expected players is the trend score) and a pretrained Chronos-2 model for three-hour forecasts with uncertainty bands.
 \end{itemize}
 Only aggregated, public, game-level data is collected. There is no data about individual players.
 
@@ -146,7 +146,7 @@ Steam charts, store, appdetails & top 100; 379 popular new releases (10--20\% wi
   \item the master dataset is stored as Snappy-compressed Parquet,
   \item the serving DB keeps 5-min data for 14 days and hourly aggregates after that.
 \end{itemize}
-The result is about 0.5M rows/day ($\approx$5--8\,MB/day in Parquet), under 1\,GB per semester.
+The master dataset is about 0.5M source events/day ($\approx$5--8\,MB/day in Parquet), under 1\,GB per semester. This excludes serving tables, forecasts, indexes, checkpoints and model weights. Forecasts are stored as one 12-step curve per game/run (up to 172,800 rows/day for 1,800 games), retained for 14 days; total disk usage must be measured.
 
 \begin{landscape}
 \begin{figure}[p]
@@ -188,7 +188,7 @@ The result is about 0.5M rows/day ($\approx$5--8\,MB/day in Parquet), under 1\,G
 \node[box=kfcblue] (prod) at (4.6,0.6) {\textbf{Python producers}\\one service,\\rate limiter,\\retry, \emph{projection}};
 \node[db=kfcblue] (kafka) at (8.9,0.6) {\textbf{Apache Kafka}\\2 topics,\\24 h retention};
 % speed layer
-\node[box=kfcteal, text width=3.6cm] (speed) at (13.6,3.6) {\textbf{Speed layer}\\Spark Structured\\Streaming};
+\node[box=kfcteal, text width=3.6cm] (speed) at (13.6,3.6) {\textbf{Speed layer}\\Spark Structured\\Streaming + Chronos-2};
 % batch layer
 \node[db=kfcteal] (hdfs) at (12.4,-2.2) {\textbf{Master dataset}\\Parquet on a Docker\\volume, append-only};
 \node[box=kfcteal, text width=3.6cm] (batch) at (16.6,-2.2) {\textbf{Batch layer}\\Spark batch jobs\\(hourly / daily)};
@@ -207,8 +207,8 @@ The result is about 0.5M rows/day ($\approx$5--8\,MB/day in Parquet), under 1\,G
 \draw[arr, dashed, draw=kfcteal] (batch.north) -- node[right, font=\sffamily\scriptsize, align=left]{model\\coefficients\\(via Postgres)} (speed.south -| batch.north);
 \draw[arr] (pg) -- (dash);
 
-\node[note, above=0.15cm of speed, text width=6.2cm] {per 5-min micro-batch: dedup, new visits = $\Delta$visits, 1 h / 3 h growth, linear-slope +3 h projection, trend score with coefficients read from \texttt{model\_coeffs}};
-\node[note, below=0.15cm of batch, text width=6.4cm] {hourly: sink to Parquet, aggregates, hourly rows and 5-min downsampling, retrain expected players model; daily: Steam$\to$Roblox matching and saturation};
+\node[note, above=0.15cm of speed, text width=6.2cm] {per 5-min micro-batch: dedup, visit deltas, growth and trend score; every 15 min: Chronos-2 forecast curve + intervals; scoring with coefficients read from \texttt{model\_coeffs}};
+\node[note, below=0.15cm of batch, text width=6.4cm] {hourly: archive, independent aggregates from Parquet, evaluate forecasts, retrain expected players; daily: matching, saturation, metadata export};
 \node[note, below=0.15cm of prod, text width=3.6cm] {keeps only needed fields; metadata upserted to Postgres on change};
 \end{tikzpicture}
 }
@@ -222,37 +222,37 @@ The result is about 0.5M rows/day ($\approx$5--8\,MB/day in Parquet), under 1\,G
   \item \textbf{Speed layer} (\ep{speed-job}: Spark Structured Streaming, local mode, 5-min trigger):
   \begin{itemize}
     \item deduplicate and validate records,
-    \item compute new visits ($\Delta$visits) and 1\,h/3\,h growth,
-    \item project players +3\,h with a least-squares slope fitted on the actual timestamps of the last 3\,h (at least 4 observations, otherwise no projection; clamped at 0); no per-game model is trained,
+    \item compute valid visit deltas and 1\,h/3\,h/24\,h growth,
+    \item every 15\,min, run pretrained Chronos-2 on regular 15-min player histories (up to 7 days, at least 24\,h usable history) to forecast 12 steps; store the median and 10th/90th percentiles,
     \item compute the trend score with the latest coefficients read from \ep{model\_coeffs} at the start of each micro-batch,
-    \item upsert 5-min rows (\ep{grain = '5m'}) into \ep{game\_metrics} and log projections to \ep{predictions}.
+    \item upsert 5-min rows (\ep{grain = '5m'}) into \ep{game\_metrics}; publish each Chronos-2 curve atomically to \ep{predictions}, independently of successful metric writes. One cached CPU model runs in a bounded background task in the speed driver, outside Spark executors; it does not block the streaming callback or load per game.
   \end{itemize}
   \item \textbf{Batch layer} (one \ep{batch} service, scheduled with APScheduler inside the app image, no external orchestrator; jobs run sequentially):
   \begin{itemize}
-    \item \emph{hourly:} Kafka $\rightarrow$ append-only Parquet master dataset (Structured Streaming with \ep{availableNow} trigger and a checkpoint on a volume; writes are idempotent, but Kafka keeps only 24\,h, so a sink outage longer than that loses data); hourly aggregates written to \ep{game\_metrics} (\ep{grain = '1h'}), deletion of 5-min rows older than 14 days (insert and delete in one transaction), filling of the actual values in \ep{predictions}, retraining of the expected players models and saving of their coefficients to \ep{model\_coeffs},
-    \item \emph{daily:} saturation and fully automatic Steam$\rightarrow$Roblox clone matching:
+    \item \emph{hourly:} Kafka $\rightarrow$ append-only Parquet master dataset (Structured Streaming with \ep{availableNow} trigger and a checkpoint on a volume; writes are idempotent, but Kafka keeps only 24\,h, so a sink outage longer than that loses data); hourly aggregates independently rebuilt from Parquet using shared calculations and written to \ep{game\_metrics} (\ep{grain = '1h'}), deletion of 5-min rows before the common hour-aligned 14-day cutoff only after archive/aggregate coverage is checked (insert and delete in one transaction), filling of real evaluation targets in \ep{predictions}, retraining of the expected players models and saving of their coefficients to \ep{model\_coeffs},
+    \item \emph{daily:} versioned metadata/update-history exports, saturation and fully automatic Steam$\rightarrow$Roblox clone matching:
     \begin{itemize}
       \item candidates are all Steam games from the store's \ep{popularnew} list released in the last 90 days (the full new-game list, not only chart entries; the release date is taken from the list and confirmed by \ep{appdetails}); their titles are searched in the Roblox search API (top 10--20 hits, about 40--80 queries/day),
       \item \ep{description} and \ep{created} of the hits are fetched from the Roblox games API (they are empty or missing in search results),
       \item titles are normalised (emoji, bracketed tags such as ``[UPD 3]'' and punctuation removed, lower case) and compared with a fuzzy token-set ratio; a short stopword list (``simulator'', ``legends'', \ldots) reduces the weight of generic words,
       \item hard rule: the Roblox game must be created after the Steam release,
       \item the match confidence (0--1) is $w\cdot\text{title score} + (1-w)\cdot\text{description score}$ with $w=0.5$ at the start: the title score is a fuzzy token-set ratio of the normalised titles; the description score is the TF--IDF cosine similarity between the Steam \ep{short\_description} and the Roblox \ep{description} (IDF fitted on the descriptions of the current candidates and their search hits). If either description is empty, the title score alone is used,
-      \item only pairs above a confidence threshold are stored in \ep{bv\_matches} and shown. The threshold and the weight $w$ are tuned on the manual sample below. After a successful daily recomputation, matches that are no longer produced are removed; if the Roblox or Steam API fails, the previous matches are kept. Saturation is the number of clones and their total players.
+      \item only pairs above a confidence threshold are stored in \ep{bv\_matches} and shown. Tune the threshold and weight $w$ on one part of the manual sample and reserve a held-out part for evaluation. After a successful daily recomputation, matches that are no longer produced are removed; if the Roblox or Steam API fails, the previous matches are kept. Saturation is the number of clones and their total players.
     \end{itemize}
-    Matching precision is evaluated once by the team on a random sample of about 100 pairs.
+    The team labels about 100 pairs split into tuning and held-out evaluation sets; report held-out precision and sample count, and inspect rejected candidates for missed matches.
   \end{itemize}
-  \item \textbf{Serving layer:} PostgreSQL holds one metrics table \ep{game\_metrics} (5-min and hourly rows distinguished by \ep{grain}, read through one view that returns 5-min rows for the last 14 days and hourly rows before that; hourly rows are authoritative for the hours they cover, 5-min rows are provisional), \ep{predictions} (forecast, actual and baselines for the health view), the batch outputs \ep{bv\_matches} and \ep{model\_coeffs}, \ep{tracked\_games}, game metadata and \ep{game\_updates} (append-only history of Roblox \ep{updated} timestamps, used for the update markers in \emph{Game details}). Metadata and update history can be re-fetched from the APIs, so no separate backup is planned.
+  \item \textbf{Serving layer:} PostgreSQL holds one metrics table \ep{game\_metrics} (5-min and hourly rows distinguished by \ep{grain}, read through one view with a shared UTC hour-aligned 14-day cutoff and fine-grained fallback for hours not yet archived; hourly rows are authoritative for the hours they cover, 5-min rows are provisional), \ep{predictions} (forecast, actual and baselines for the health view), the batch outputs \ep{bv\_matches} and \ep{model\_coeffs}, \ep{tracked\_games}, game metadata and \ep{game\_updates} (append-only history of Roblox \ep{updated} timestamps, used for the update markers in \emph{Game details}). Historical update timestamps cannot be re-fetched from current APIs, so daily versioned exports preserve metadata and update history outside the PostgreSQL volume. Separate persistent checkpoints and timestamp-conditional upserts support replay from the archive. Health records processing failures and missing offset ranges as well as fresh source timestamps.
 \end{itemize}
 
 \textbf{ML.}
 \begin{itemize}
-  \item \textbf{Expected players model} (Spark MLlib, linear regression): one model per platform, because the platforms share only some features. It is trained every hour on the last 7 days of hourly snapshots of the tracked games of that platform, on $\log(1+\text{players})$. Features are context only: hour of day, day of week, genre (one-hot, \ep{genre\_l1} for Roblox, first Steam genre for Steam), game age, trailing mean of $\log(1+\text{players})$ over the previous 7 days, and, for Roblox only, like ratio. The game's own recent growth is excluded so the model does not become circular. Trailing means use only observations before the evaluated one. A game is scored only after 24\,h of history (cold start). The trend score is $\text{actual} / \text{expected}$ (both converted back from the log scale): values well above 1 mean rising, well below 1 mean fading. It is evaluated with $R^2$ and RMSE on a hold-out of the last day. Feature preprocessing (genre levels, means) is saved together with the coefficients.
-  \item \textbf{Projection:} a least-squares slope fitted on the timestamped observations of the last 3\,h (Roblox top games are polled every 5 min, the others and Steam every 15 min; at least 4 observations are required) gives the growth rate and the +3\,h projection (clamped at 0). For a forecast made at $t$ it is evaluated by MAE against the actual value at $t+3$\,h (filled in by the hourly batch job into table \ep{predictions}) and compared with two baselines: ``same as now'' (value at $t$) and ``same time yesterday'' (value at $t+3\,\text{h}-24\,\text{h}$). The result is shown in the \emph{Model and data health} view.
+  \item \textbf{Expected players model} (Spark MLlib, linear regression): one model per platform, because the platforms share only some features. It is trained every hour on the last 7 days of hourly snapshots of the tracked games of that platform, on $\log(1+\text{players})$. Features are context only: hour of day, day of week, genre (one-hot, \ep{genre\_l1} for Roblox, first Steam genre for Steam), game age, trailing mean of $\log(1+\text{players})$ over the previous 7 days, and, for Roblox only, like ratio. The game's own recent growth is excluded so the model does not become circular. Trailing means use only observations before the evaluated one. A game is scored only after 24\,h of history (cold start). Expected players are $\max(1,\exp(\widehat{y})-1)$, where $\widehat{y}$ is the predicted log-target; the trend score is actual players divided by this expectation. Values above/below 1 mean above/below expected activity; growth supplies direction. Missing or zero-total Roblox votes use a neutral like ratio of 0.5. Evaluate on the last completed day using a fit from the preceding six days, report player-scale $R^2$/RMSE and sample count, then refit the serving model on all seven days. Feature preprocessing (genre levels, means) is saved together with the coefficients.
+  \item \textbf{Projection} (\href{https://huggingface.co/amazon/chronos-2}{Chronos-2}, pretrained \ep{amazon/chronos-2}): zero-shot inference on player history only, no fine-tuning. Every 15\,min, forecast 12 steps (+3\,h) from up to seven days of 15-min observations. The dashboard shows the median and 10th--90th percentile band, forecast age and coverage. Require at least 24\,h usable history; fill at most one missing interval from a past value and skip longer gaps. Record the model revision with every curve. Hourly batch evaluation compares +3\,h MAE against persistence, yesterday at the target time minus 24\,h, and the former three-hour linear-slope method, now an evaluation baseline only. All methods use the same real targets and eligible samples; also report interval coverage. The detailed input, missing-data, evaluation and freshness rules are in \ep{docs/contracts.md}.
 \end{itemize}
 
 %======================================================================
 \section{Dashboard}
-Streamlit + Plotly. It shows only what the sources provide. \emph{Model and data health} is a plain page: MAE against the two baselines, $R^2$/RMSE of the expected players model, data age per feed and the dropped-row counter. Growth, sparklines, projections and scores appear once enough history has been collected (hours to days).
+Streamlit + Plotly. It shows only what the sources provide. \emph{Model and data health} is a plain page: Chronos-2 MAE against three baselines, interval coverage, $R^2$/RMSE of the expected players model, data and job freshness, forecast latency/coverage, API errors and dropped rows. Forecasts older than 30\,min are marked stale; after 3\,h or with no remaining future step, projection is unavailable. Growth, sparklines, projections and scores appear once enough history has been collected (hours to days).
 
 \textbf{Matched-game navigation.} Selecting a Steam opportunity opens its details and a table of matched Roblox games: clickable name, latest players, 3\,h growth, creation date and match confidence. Selecting a Roblox name opens that game's metrics and player history. Its details show each possible Steam counterpart and, under each one, \emph{Other Roblox games matched to this Steam game}, excluding the current game. These tables reuse the existing matches, metadata and metrics; no separate similarity model or API is needed. Games with no Steam match show their own metrics and an empty-state message. The UI labels these relationships as \emph{matched games} or \emph{possible counterparts}, since the heuristic does not verify copying. Read and navigation rules are defined in \ep{docs/contracts.md}.
 \begin{figure}[H]
@@ -277,26 +277,26 @@ Streamlit + Plotly. It shows only what the sources provide. \emph{Model and data
 \foreach \xx/\tx in {0.4/Steam game (release), 3.9/Steam players, 6.1/Roblox matches, 8.1/Players, 9.5/Saturation} {\node[anchor=west, text=kfcgray] at (\xx,4.15) {\tx};}
 \draw[kfcgray!50] (0.3,3.9) -- (10.7,3.9);
 \node[anchor=west] at (0.4,3.5) {Dressmaker (21 Sep 2026)}; \node[anchor=west] at (3.9,3.5) {(live)}; \node[anchor=west] at (6.1,3.5) {3 games}; \node[anchor=west] at (8.1,3.5) {1,278}; \node[ph, fill=lightteal, anchor=west] at (9.5,3.5) {low};
-\node[anchor=west] at (0.4,2.9) {R.E.P.O. (26 Feb 2025)}; \node[anchor=west] at (3.9,2.9) {(live)}; \node[anchor=west] at (6.1,2.9) {n matches}; \node[anchor=west] at (8.1,2.9) {sum}; \node[ph, fill=lightamber, anchor=west] at (9.5,2.9) {high};
+\node[anchor=west] at (0.4,2.9) {Example (Oct 2026)}; \node[anchor=west] at (3.9,2.9) {(live)}; \node[anchor=west] at (6.1,2.9) {n matches}; \node[anchor=west] at (8.1,2.9) {sum}; \node[ph, fill=lightamber, anchor=west] at (9.5,2.9) {high};
 % ---- view 2
 \draw[frame] (11.6,0) rectangle (22.6,9.2);
 \node[hd, anchor=west] at (11.9,8.75) {Game details: Be A Dressmaker};
 \foreach \ii/\lb/\vl in {0/Players now/612, 1/Lifetime visits/value, 2/Like ratio/value, 3/Created/28 Sep 2026, 4/Last update/value} {
   \node[ph, minimum width=1.95cm, minimum height=0.95cm, anchor=north west, text width=1.8cm] at (11.9+\ii*2.1,8.35) {\lb\\\textbf{\vl}};}
-\node[ph, minimum width=10.4cm, minimum height=3.2cm, anchor=north west, text width=10cm] at (11.9,7.1) {Players time series (5-min, last 14 days; hourly before) with update markers,\\dashed +3 h projection and a selected possible Steam counterpart on a secondary axis};
+\node[ph, minimum width=10.4cm, minimum height=3.2cm, anchor=north west, text width=10cm] at (11.9,7.1) {Players time series (5-min, last 14 days; hourly before) with update markers,\\Chronos-2 median +3 h curve with uncertainty band and forecast age,\\and a selected possible Steam counterpart on a secondary axis};
 \node[hd, anchor=west] at (11.9,3.45) {Dates};
 \node[ph, minimum width=10.4cm, minimum height=1.3cm, anchor=north west, text width=10cm] at (11.9,3.2) {Possible Steam counterpart (click to open): released 21 Sep\\Matched Roblox games created: 26 Sep, 27 Sep, 28 Sep};
 \node[ph, minimum width=6.4cm, minimum height=1.25cm, anchor=south west, text width=6.2cm] at (11.9,0.4) {Other Roblox games matched to this Steam game\\Clickable name, players, 3 h growth, created, confidence};
 \node[ph, fill=lightblue, minimum width=3.7cm, minimum height=1.25cm, anchor=south west, text width=3.5cm] at (18.6,0.4) {Match confidence\\\textbf{0.87} (threshold 0.7)};
 \end{tikzpicture}
 }
-\caption{Wireframe of \emph{Trending now} (with the opportunities table) and \emph{Game details}. Player counts and dates are real measurements from 17 Oct 2026. Growth, score, projection, saturation and match-confidence values are illustrative.}
+\caption{Wireframe of \emph{Trending now} (with the opportunities table) and \emph{Game details}. Named-game player counts and dates are measurements from 17 Oct 2026; the second opportunity row is illustrative. Growth, score, projection, saturation and match-confidence values are illustrative.}
 \label{fig:wire}
 \end{figure}
 
 %======================================================================
 \section{Infrastructure and technologies}
-Everything runs locally with Docker Compose and needs about 6\,GB of RAM. There are two ready-made images (Kafka, PostgreSQL) and one own image, \ep{app}, which contains Python 3.12, Java 17 and Spark 3.5 with the Kafka connector and the PostgreSQL JDBC driver built in. The \ep{app} image is started as four services that differ only in their \ep{command}. This gives separate logs and restarts while there is still a single Dockerfile.
+Everything runs locally with Docker Compose. The previous 6\,GB RAM estimate is not verified for Chronos-2; benchmark full-stack CPU time and peak memory before fixing the deployment budget. There are two ready-made images (Kafka, PostgreSQL) and one own image, \ep{app}, which contains Python 3.12, Java 17 and Spark 3.5 with the Kafka connector and PostgreSQL JDBC driver, plus PyTorch and \ep{chronos-forecasting}. Model weights are cached on a persistent volume and their revision is pinned; CPU inference is the initial deployment, with no paid endpoint required. The \ep{app} image is started as four services that differ only in their \ep{command}. This gives separate logs and restarts while there is still a single Dockerfile.
 \begin{table}[H]
 \centering\small
 \begin{tabularx}{\textwidth}{L{3.0cm} L{3.4cm} Y}
@@ -306,8 +306,8 @@ Everything runs locally with Docker Compose and needs about 6\,GB of RAM. There 
 \ep{kafka} & \ep{apache/kafka:3.7.0} (KRaft) & message broker, 24\,h retention (1\,GB RAM)\\
 \ep{postgres} & \ep{postgres:16} & serving layer: \ep{game\_metrics}, \ep{predictions}, \ep{bv\_matches}, \ep{model\_coeffs}, metadata (512\,MB)\\
 \ep{producers} & \ep{app} & Roblox: ranking lists, games and votes every 5/15 min, search daily; Steam: current players every 15 min, charts, store search and details daily\\
-\ep{speed-job} & \ep{app} & speed layer (Structured Streaming, \ep{spark.driver.memory} 2\,GB)\\
-\ep{batch} & \ep{app} & scheduled sequential jobs: hourly Kafka $\rightarrow$ Parquet sink on volume \ep{/data/master}, aggregates, model training; daily matching (2\,GB)\\
+\ep{speed-job} & \ep{app} & Structured Streaming + cached Chronos-2 background inference every 15 min; benchmark combined JVM/Python memory\\
+\ep{batch} & \ep{app} & scheduled sequential jobs: hourly Kafka $\rightarrow$ Parquet sink on volume \ep{/data/master}, aggregates, model training; daily matching and metadata export; archive work has priority\\
 \ep{dashboard} & \ep{app} & Streamlit on port 8501\\
 \bottomrule
 \end{tabularx}
@@ -323,13 +323,15 @@ Ingestion & Python producers (\ep{requests}, \ep{confluent-kafka}, APScheduler) 
 Messaging & Apache Kafka 3.7 (KRaft, single broker) & Redpanda, RabbitMQ\\
 Batch storage & Parquet + Snappy on a Docker volume & HDFS, MinIO (S3); switching only changes the storage path\\
 Batch processing / ML & Apache Spark 3.5 (PySpark, local mode), Spark MLlib; \ep{rapidfuzz} (titles) and \ep{scikit-learn} TF--IDF (descriptions) for clone matching & Hive, Pandas\\
-Stream processing & Spark Structured Streaming & Apache Flink, Kafka Streams\\
+Stream processing / forecasting & Spark Structured Streaming; Chronos-2 via PyTorch (CPU, cached weights) & Apache Flink, Kafka Streams; linear forecast retained as baseline\\
 Scheduling & APScheduler inside the \ep{app} services & Apache Airflow, cron\\
 Serving & PostgreSQL 16 & TimescaleDB, Cassandra\\
 Presentation & Streamlit + Plotly & Grafana, Apache Superset\\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+\textbf{Validation gates and limitations.} Before final sizing, benchmark Chronos-2 with 50 games and then all eligible tracked games, seven-day histories and 12-step forecasts; each cycle must fit the 15-min refresh interval while stream ingestion stays fresh. Record model/dependency revisions, CPU, batch size, latency and peak memory. No accuracy or hardware budget is claimed without measurement. Matching covers only discovered games and the first 10--20 Roblox search hits; the creation-date rule misses games repurposed from older universes. Reserve part of the manually labelled sample for evaluation rather than tuning all 100 pairs. Undocumented discovery endpoints may change; saved responses are parser fixtures, and measured API timings are observations rather than guaranteed quotas. Store processing and model status independently so fresh API data cannot hide a failed archive, stale model or forecast outage.
 
 %======================================================================
 \section{Planned use of GenAI tools}
