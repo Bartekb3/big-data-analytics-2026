@@ -29,6 +29,16 @@ Common fields: `kind`, `ts` (ISO-8601 UTC, producer time), `id` (Roblox `univers
 - Hard rule: Roblox `created` must be after the Steam release date.
 - After a successful daily recomputation, matches that are no longer produced are deleted. If a Roblox or Steam API call fails, the run is aborted and the previous `bv_matches` stay unchanged.
 
+## Matched-game reads and navigation
+
+- Game details are selected by `(platform, id)`. Clicking a game name opens that game's details, including its metadata, player history, growth and projection when available.
+- Selecting a Steam opportunity opens its Steam details and a matched-Roblox table. Read `bv_matches` by `steam_id`, join `games` on `platform = 'roblox'` and `id = roblox_id`, and attach the latest metrics row with a non-null `players` from `game_metrics_view` for that Roblox game. Return one row per matched Roblox ID, never one per historical observation.
+- Each matched-Roblox row shows a clickable name, latest players, `growth_3h`, creation date, confidence and the metrics timestamp. Order by latest players descending (missing values last), then Roblox ID. Missing history or metrics appear as unavailable, not zero, and do not prevent opening details.
+- Roblox details list all linked possible Steam counterparts, each linking to its Steam details. For each Steam ID, read the same matched-Roblox table under **Other Roblox games matched to this Steam game**, excluding the current Roblox ID. Keep groups separate when a game has multiple Steam matches; no genre-based fallback or extra similarity model is used.
+- Steam games with no matches show an empty matched-games table. Roblox games with no Steam match show their own metrics and **No Steam match found**. Missing matches do not block the details page.
+- Match counts use distinct Roblox IDs for the selected Steam game; player totals use each matched game's latest available player count once. Show the number of matched games without player data alongside the known-player total; never treat missing counts as zero. A successful match run with no matches has count and total zero.
+- User-facing labels are **matched games** or **possible counterparts**, not claims of verified clones or a proven Steam origin. The existing `bv_matches` schema and matching algorithm remain the source of these relationships.
+
 ## Roblox event precedence and deduplication
 
 - **Roles:** `game` events supply the player history (`players`, `visits`, `favorites`). `votes` events only enrich the same time bucket (`up`, `down`). `sort` events only drive discovery (register or refresh a row in `tracked_games`, update `last_seen`) and never write player counts.
