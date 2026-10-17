@@ -1,0 +1,33 @@
+# LaTeX auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
+*.idx
+*.ilg
+*.ind
+*.glo
+*.gls
+*.glg
+*.acn
+*.acr
+*.alg
+*.xdv
+*.run.xml
+*-blx.bib
+*.bcf
+
+# Compilation output folder: ignore everything except PDFs
+compiled/*
+!compiled/*.pdf

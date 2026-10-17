@@ -1,0 +1,512 @@
+{
+  "previousPageCursor": null,
+  "nextPageCursor": null,
+  "data": [
+    {
+      "id": 3181581226889239,
+      "name": "G",
+      "description": null,
+      "displayName": "G",
+      "displayDescription": null,
+      "enabled": true,
+      "iconImageId": 127679841776434,
+      "displayIconImageId": 127679841776434,
+      "created": "2025-04-07T22:29:09.644+00:00",
+      "updated": "2025-04-07T22:29:09.644+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 118004,
+        "awardedCount": 515836963,
+        "winRatePercentage": 0.272
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 2432009301742310,
+      "name": "A",
+      "description": null,
+      "displayName": "A",
+      "displayDescription": null,
+      "enabled": true,
+      "iconImageId": 107650932746498,
+      "displayIconImageId": 107650932746498,
+      "created": "2025-04-07T22:29:31.482+00:00",
+      "updated": "2025-04-07T22:29:31.482+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 118229,
+        "awardedCount": 515073841,
+        "winRatePercentage": 0.272
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 3495711621999816,
+      "name": "R",
+      "description": null,
+      "displayName": "R",
+      "displayDescription": null,
+      "enabled": true,
+      "iconImageId": 74097401239207,
+      "displayIconImageId": 74097401239207,
+      "created": "2025-04-07T22:29:46.373+00:00",
+      "updated": "2025-04-07T22:29:46.373+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 118376,
+        "awardedCount": 517163640,
+        "winRatePercentage": 0.272
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 3310355054544865,
+      "name": "D",
+      "description": null,
+      "displayName": "D",
+      "displayDescription": null,
+      "enabled": true,
+      "iconImageId": 75270145547305,
+      "displayIconImageId": 75270145547305,
+      "created": "2025-04-07T22:29:59.686+00:00",
+      "updated": "2025-04-07T22:30:58.271+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 118501,
+        "awardedCount": 517487818,
+        "winRatePercentage": 0.273
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 3195330021311033,
+      "name": "E",
+      "description": null,
+      "displayName": "E",
+      "displayDescription": null,
+      "enabled": true,
+      "iconImageId": 76386289358595,
+      "displayIconImageId": 76386289358595,
+      "created": "2025-04-07T22:30:12.917+00:00",
+      "updated": "2025-04-07T22:30:12.917+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 118571,
+        "awardedCount": 517722150,
+        "winRatePercentage": 0.273
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 34852060037844,
+      "name": "N",
+      "description": null,
+      "displayName": "N",
+      "displayDescription": null,
+      "enabled": true,
+      "iconImageId": 92546799572709,
+      "displayIconImageId": 92546799572709,
+      "created": "2025-04-07T22:30:22.555+00:00",
+      "updated": "2025-04-07T22:31:11.221+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 118640,
+        "awardedCount": 517970617,
+        "winRatePercentage": 0.273
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 3602894446235962,
+      "name": "Purchased Advanced Sprinkler!",
+      "description": "Purchased Advanced Sprinkler!",
+      "displayName": "Purchased Advanced Sprinkler!",
+      "displayDescription": "Purchased Advanced Sprinkler!",
+      "enabled": true,
+      "iconImageId": 90649710681292,
+      "displayIconImageId": 90649710681292,
+      "created": "2025-04-14T22:51:58.849+00:00",
+      "updated": "2025-04-14T22:51:58.849+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 9338,
+        "awardedCount": 120588941,
+        "winRatePercentage": 0.021
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 4330691652818014,
+      "name": "Purchased Basic Sprinkler!",
+      "description": "Purchased Basic Sprinkler!",
+      "displayName": "Purchased Basic Sprinkler!",
+      "displayDescription": "Purchased Basic Sprinkler!",
+      "enabled": true,
+      "iconImageId": 85851166973186,
+      "displayIconImageId": 85851166973186,
+      "created": "2025-04-14T22:52:25.926+00:00",
+      "updated": "2025-04-14T22:52:25.926+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 12672,
+        "awardedCount": 149564017,
+        "winRatePercentage": 0.029
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 2213702621912050,
+      "name": "Purchased Godly Sprinkler!",
+      "description": "THE GODLY SPRINKY",
+      "displayName": "Purchased Godly Sprinkler!",
+      "displayDescription": "THE GODLY SPRINKY",
+      "enabled": true,
+      "iconImageId": 75813486408139,
+      "displayIconImageId": 75813486408139,
+      "created": "2025-04-14T22:52:46.023+00:00",
+      "updated": "2025-04-14T22:52:46.023+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 7213,
+        "awardedCount": 114514386,
+        "winRatePercentage": 0.017
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 397821235877805,
+      "name": "Spikey!",
+      "description": "Sold Cactus Fruit",
+      "displayName": "Spikey!",
+      "displayDescription": "Sold Cactus Fruit",
+      "enabled": true,
+      "iconImageId": 110542552463579,
+      "displayIconImageId": 110542552463579,
+      "created": "2025-04-14T22:53:52.837+00:00",
+      "updated": "2025-04-14T22:53:52.837+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 7361,
+        "awardedCount": 128134412,
+        "winRatePercentage": 0.017
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 3966694991137927,
+      "name": "Your first carrot!",
+      "description": "Plant a carrot!",
+      "displayName": "Your first carrot!",
+      "displayDescription": "Plant a carrot!",
+      "enabled": true,
+      "iconImageId": 76765367551201,
+      "displayIconImageId": 76765367551201,
+      "created": "2025-04-14T22:54:35.108+00:00",
+      "updated": "2025-04-14T22:54:35.108+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 91838,
+        "awardedCount": 417321584,
+        "winRatePercentage": 0.211
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 674039989298417,
+      "name": "SHINY!",
+      "description": "Collect your first gold fruit!",
+      "displayName": "SHINY!",
+      "displayDescription": "Collect your first gold fruit!",
+      "enabled": true,
+      "iconImageId": 116387418486761,
+      "displayIconImageId": 116387418486761,
+      "created": "2025-04-14T22:54:58.595+00:00",
+      "updated": "2025-04-14T22:54:58.595+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 42591,
+        "awardedCount": 235971121,
+        "winRatePercentage": 0.098
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 3833249137800902,
+      "name": "God apple!",
+      "description": "Pick a golden apple.",
+      "displayName": "God apple!",
+      "displayDescription": "Pick a golden apple.",
+      "enabled": true,
+      "iconImageId": 87404076475954,
+      "displayIconImageId": 87404076475954,
+      "created": "2025-04-14T22:57:07.211+00:00",
+      "updated": "2025-04-14T23:14:10.196+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 5407,
+        "awardedCount": 97876185,
+        "winRatePercentage": 0.012
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 3046817076424642,
+      "name": "GIANT TOMATO",
+      "description": "Sell a tomato thats above 7KG",
+      "displayName": "GIANT TOMATO",
+      "displayDescription": "Sell a tomato thats above 7KG",
+      "enabled": true,
+      "iconImageId": 78264572763647,
+      "displayIconImageId": 78264572763647,
+      "created": "2025-04-14T23:10:51.559+00:00",
+      "updated": "2025-04-14T23:10:51.559+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 222,
+        "awardedCount": 5351519,
+        "winRatePercentage": 0.001
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 1013473936180275,
+      "name": "Carrot connoisseur",
+      "description": "Sell 1000 carrots.",
+      "displayName": "Carrot connoisseur",
+      "displayDescription": "Sell 1000 carrots.",
+      "enabled": true,
+      "iconImageId": 122274708430807,
+      "displayIconImageId": 122274708430807,
+      "created": "2025-04-14T23:11:34.522+00:00",
+      "updated": "2025-04-14T23:11:34.522+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 13258,
+        "awardedCount": 124003247,
+        "winRatePercentage": 0.031
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 4429839651101981,
+      "name": "Colorful fruit!",
+      "description": "Pick a rainbow fruit!",
+      "displayName": "Colorful fruit!",
+      "displayDescription": "Pick a rainbow fruit!",
+      "enabled": true,
+      "iconImageId": 89102530341646,
+      "displayIconImageId": 89102530341646,
+      "created": "2025-04-14T23:12:03.169+00:00",
+      "updated": "2025-04-14T23:12:03.169+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 820,
+        "awardedCount": 139878759,
+        "winRatePercentage": 0.002
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 393879997365151,
+      "name": "Care taker",
+      "description": "Use 10 watering cans!",
+      "displayName": "Care taker",
+      "displayDescription": "Use 10 watering cans!",
+      "enabled": true,
+      "iconImageId": 108262868741575,
+      "displayIconImageId": 108262868741575,
+      "created": "2025-04-14T23:12:37.689+00:00",
+      "updated": "2025-04-14T23:12:37.689+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 15477,
+        "awardedCount": 171029134,
+        "winRatePercentage": 0.036
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 2585648043281722,
+      "name": "Melon madness!",
+      "description": "Planted 50 Water melons total!",
+      "displayName": "Melon madness!",
+      "displayDescription": "Planted 50 Water melons total!",
+      "enabled": true,
+      "iconImageId": 75782119829037,
+      "displayIconImageId": 75782119829037,
+      "created": "2025-04-14T23:13:19.265+00:00",
+      "updated": "2025-04-14T23:13:51.972+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 680,
+        "awardedCount": 24540788,
+        "winRatePercentage": 0.002
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 1089770809267851,
+      "name": "Grand Achievement",
+      "description": "Finish the Core Fruit Achievement Set",
+      "displayName": "Grand Achievement",
+      "displayDescription": "Finish the Core Fruit Achievement Set",
+      "enabled": true,
+      "iconImageId": 97082743388212,
+      "displayIconImageId": 97082743388212,
+      "created": "2025-08-20T02:14:34.715+00:00",
+      "updated": "2025-08-22T20:48:55.182+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 2,
+        "awardedCount": 94186,
+        "winRatePercentage": 0.0
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 157951702469162,
+      "name": "What Came First?",
+      "description": "Hatch 200 Eggs",
+      "displayName": "What Came First?",
+      "displayDescription": "Hatch 200 Eggs",
+      "enabled": true,
+      "iconImageId": 103609121439971,
+      "displayIconImageId": 103609121439971,
+      "created": "2025-08-20T02:15:18.183+00:00",
+      "updated": "2025-08-22T20:48:43.193+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 288,
+        "awardedCount": 4557215,
+        "winRatePercentage": 0.001
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 2526153383283460,
+      "name": "Seedpack Connoisseur",
+      "description": "Open 200 Seed Packs",
+      "displayName": "Seedpack Connoisseur",
+      "displayDescription": "Open 200 Seed Packs",
+      "enabled": true,
+      "iconImageId": 100090812847087,
+      "displayIconImageId": 100090812847087,
+      "created": "2025-08-20T02:15:43.133+00:00",
+      "updated": "2025-08-22T20:48:31.568+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 236,
+        "awardedCount": 2917434,
+        "winRatePercentage": 0.001
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 4493388333080928,
+      "name": "Pet Master",
+      "description": "Get a pet to age 100",
+      "displayName": "Pet Master",
+      "displayDescription": "Get a pet to age 100",
+      "enabled": true,
+      "iconImageId": 79853347797773,
+      "displayIconImageId": 79853347797773,
+      "created": "2025-08-20T02:17:07.362+00:00",
+      "updated": "2025-08-22T20:48:17.566+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 19739,
+        "awardedCount": 37857435,
+        "winRatePercentage": 0.045
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    },
+    {
+      "id": 3035855755279266,
+      "name": "Sweet Fortune",
+      "description": null,
+      "displayName": "Sweet Fortune",
+      "displayDescription": null,
+      "enabled": true,
+      "iconImageId": 126632717175984,
+      "displayIconImageId": 126632717175984,
+      "created": "2026-10-15T20:11:32.942+00:00",
+      "updated": "2026-10-16T21:49:40.876+00:00",
+      "statistics": {
+        "pastDayAwardedCount": 0,
+        "awardedCount": 0,
+        "winRatePercentage": 0.0
+      },
+      "awardingUniverse": {
+        "id": 7436755782,
+        "name": "[🎃] Grow a Garden 🌶️",
+        "rootPlaceId": 126884695634066
+      }
+    }
+  ]
+}
