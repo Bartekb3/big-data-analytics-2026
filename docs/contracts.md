@@ -16,6 +16,18 @@ Common fields: `kind`, `ts` (ISO-8601 UTC, producer time), `id` (Roblox `univers
 ### `steam.players`
 `ts`, `id` (Steam `appid`), `players` (`player_count`).
 
+## Tracked set rules
+
+- The Roblox producer registers every game seen in a ranking list (`sort` events) or refreshes its `last_seen`. The daily matcher registers clone candidates (`is_clone_candidate = true`).
+- Cadence: the top ~500 tracked Roblox games by latest `players` are polled every 5 min, the rest every 15 min. Steam games (<= 300, from the charts and clone candidates) every 15 min.
+- At the cap (~1,500): evict games with the oldest `last_seen` first; clone candidates are evicted last.
+
+## Clone matching rules
+
+- `confidence = min(1, title_score + bonus)`, where `title_score` is the normalised fuzzy token-set ratio scaled to 0..1 and `bonus` is a fixed value (start at 0.1) when the Steam title appears in the Roblox `description`. Threshold and bonus are tuned on the manual sample of ~100 pairs.
+- Hard rule: Roblox `created` must be after the Steam release date.
+- After a successful daily recomputation, matches that are no longer produced are deleted. If a Roblox or Steam API call fails, the run is aborted and the previous `bv_matches` stay unchanged.
+
 ## Roblox event precedence and deduplication
 
 - **Roles:** `game` events supply the player history (`players`, `visits`, `favorites`). `votes` events only enrich the same time bucket (`up`, `down`). `sort` events only drive discovery (register or refresh a row in `tracked_games`, update `last_seen`) and never write player counts.
@@ -38,6 +50,14 @@ CREATE TABLE games (
   released  date,                       -- Steam release date
   updated   timestamptz,                -- Roblox last update
   PRIMARY KEY (platform, id)
+);
+
+-- append-only history of Roblox updates; the producer inserts a row when games.updated changes
+-- (metadata and this table can be re-fetched/rebuilt from the APIs, so no backup is planned)
+CREATE TABLE game_updates (
+  platform text NOT NULL, id bigint NOT NULL,
+  updated timestamptz NOT NULL, seen_at timestamptz NOT NULL,
+  PRIMARY KEY (platform, id, updated)
 );
 
 -- tracked set (cap ~1,500)
