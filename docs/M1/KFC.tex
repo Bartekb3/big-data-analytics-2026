@@ -114,7 +114,8 @@ Public web APIs. The Games API is documented as a legacy API (\url{https://creat
 \textbf{Endpoint} & \textbf{Attributes used} & \textbf{Purpose}\\
 \midrule\endhead
 \eu{ISteamUserStats/GetNumberOfCurrentPlayers/v1?appid=..} & \ep{player\_count} (1 game per call) & Steam player stream\\
-\eu{ISteamChartsService/GetMostPlayedGames/v1} & \ep{rank, appid, last\_week\_rank, peak\_in\_game} (top 100, daily) & candidate games (released in the last 90 days, filtered via \ep{appdetails})\\
+\eu{ISteamChartsService/GetMostPlayedGames/v1} & \ep{rank, appid, last\_week\_rank, peak\_in\_game} (top 100, daily) & candidate games (charts, used to rank candidates by players)\\
+\eu{store.steampowered.com/search/results/?filter=popularnew} & appid, title, release date (HTML in JSON, 100 per page; \ep{data-ds-appid}, \ep{span.title}, \ep{search\_released}) & full list of recent releases; entries released in the last 90 days are the clone candidates\\
 \eu{store.steampowered.com/api/appdetails?appids=..} & \ep{name, release\_date, genres} & game metadata\\
 \bottomrule
 \end{longtable}}
@@ -129,9 +130,9 @@ Public web APIs. The Games API is documented as a legacy API (\url{https://creat
 Roblox ranking lists & 60 requests $\rightarrow$ 1,583 unique games (12 countries probed), $\sim$100\,kB/response, no throttling; 3 countries kept & every 15 min & $\sim$90k\\
 Roblox game snapshots & $\sim$1.4\,kB/record; within 60\,s, \ep{playing} changed for 82\% and \ep{visits} for 94\% of games; HTTP 429 after $\sim$11 rapid requests & top $\sim$500 every 5 min, the rest ($\le$1,000) every 15 min & $\sim$240k\\
 Roblox votes & 2,060 games in 30\,s without throttling & every 15 min, same loop as games, $\le$1,500 games & $\sim$144k\\
-Roblox search & 40 results/query & daily, $\sim$50 queries (clone candidates) & $<$1k\\
+Roblox search & 40 results/query & daily, one query per new Steam game (about 40--80) & $<$1k\\
 Steam current players & median 0.36\,s/call, about 100k calls/day allowed & every 15 min, $\le$300 games & $\sim$29k\\
-Steam charts, appdetails & top 100; appdetails about 200 req/5 min & daily / new game & small\\
+Steam charts, store, appdetails & top 100; 379 popular new releases (10--20\% within 90 days); appdetails about 200 req/5 min & daily / new game & small\\
 \bottomrule
 \end{tabularx}
 \caption{Base characteristics. All data is semi-structured JSON over HTTPS (REST polling). Average velocity is about 350 records/min.}
@@ -296,7 +297,7 @@ The result is about 0.5M rows/day ($\approx$5--8\,MB/day in Parquet), under 1\,G
     \item \emph{hourly:} Kafka $\rightarrow$ append-only Parquet master dataset (Structured Streaming with \ep{availableNow} trigger and a checkpoint on a volume; writes are idempotent, but Kafka keeps only 24\,h, so a sink outage longer than that loses data); hourly aggregates written to \ep{game\_metrics} (\ep{grain = '1h'}), deletion of 5-min rows older than 14 days (insert and delete in one transaction), filling of the actual values in \ep{predictions}, retraining of the expected players models and saving of their coefficients to \ep{model\_coeffs},
     \item \emph{daily:} saturation and fully automatic Steam$\rightarrow$Roblox clone matching:
     \begin{itemize}
-      \item candidates are Steam games released in the last 90 days that are among the top $\sim$50 by current players; their titles are searched in the Roblox search API (top 10--20 hits, $\sim$50 queries/day),
+      \item candidates are all Steam games from the store's \ep{popularnew} list released in the last 90 days (the full new-game list, not only chart entries; the release date is taken from the list and confirmed by \ep{appdetails}); their titles are searched in the Roblox search API (top 10--20 hits, about 40--80 queries/day),
       \item \ep{description} and \ep{created} of the hits are fetched from the Roblox games API (they are empty or missing in search results),
       \item titles are normalised (emoji, bracketed tags such as ``[UPD 3]'' and punctuation removed, lower case) and compared with a fuzzy token-set ratio; a short stopword list (``simulator'', ``legends'', \ldots) reduces the weight of generic words,
       \item hard rule: the Roblox game must be created after the Steam release,
@@ -367,7 +368,7 @@ Everything runs locally with Docker Compose and needs about 6\,GB of RAM. There 
 \midrule
 \ep{kafka} & \ep{apache/kafka:3.7.0} (KRaft) & message broker, 24\,h retention (1\,GB RAM)\\
 \ep{postgres} & \ep{postgres:16} & serving layer: \ep{game\_metrics}, \ep{predictions}, \ep{bv\_matches}, \ep{model\_coeffs}, metadata (512\,MB)\\
-\ep{producers} & \ep{app} & Roblox: ranking lists, games and votes every 5/15 min, search daily; Steam: current players every 15 min, charts and details daily\\
+\ep{producers} & \ep{app} & Roblox: ranking lists, games and votes every 5/15 min, search daily; Steam: current players every 15 min, charts, store search and details daily\\
 \ep{speed-job} & \ep{app} & speed layer (Structured Streaming, \ep{spark.driver.memory} 2\,GB)\\
 \ep{batch} & \ep{app} & scheduled sequential jobs: hourly Kafka $\rightarrow$ Parquet sink on volume \ep{/data/master}, aggregates, model training; daily matching (2\,GB)\\
 \ep{dashboard} & \ep{app} & Streamlit on port 8501\\

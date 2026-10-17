@@ -19,7 +19,7 @@ Common fields: `kind`, `ts` (ISO-8601 UTC, producer time), `id` (Roblox `univers
 ## Tracked set rules
 
 - The Roblox producer registers every game seen in a ranking list (`sort` events) or refreshes its `last_seen`. The daily matcher registers clone candidates (`is_clone_candidate = true`).
-- Cadence: the top ~500 tracked Roblox games by latest `players` are polled every 5 min, the rest every 15 min. Steam games (<= 300, from the charts and clone candidates) every 15 min.
+- Cadence: the top ~500 tracked Roblox games by latest `players` are polled every 5 min, the rest every 15 min. Steam games (<= 300: chart games and clone candidates, ranked by current players) every 15 min. Clone candidates are all `popularnew` games released in the last 90 days.
 - At the cap (~1,500): evict games with the oldest `last_seen` first; clone candidates are evicted last.
 
 ## Clone matching rules
