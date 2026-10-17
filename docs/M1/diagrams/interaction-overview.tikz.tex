@@ -1,0 +1,76 @@
+% Retained interaction overview; conceptual notation, not formal BPMN.
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  task/.style={rectangle, rounded corners=4pt, draw=kfcgray, fill=white, thick, minimum width=2.9cm, minimum height=1.15cm, align=center, text width=2.7cm},
+  start/.style={circle, draw=kfcteal, thick, minimum size=0.75cm, fill=lightteal},
+  timer/.style={circle, draw=kfcteal, double, thick, minimum size=0.75cm, fill=lightteal},
+  endev/.style={circle, draw=red!60!black, line width=2.2pt, minimum size=0.75cm, fill=red!8},
+  gw/.style={diamond, draw=kfcpurple, thick, fill=lightpurple, minimum size=1.05cm, inner sep=0pt, font=\sffamily\bfseries},
+  flow/.style={-{Stealth[length=2.6mm]}, thick, draw=kfcgray},
+  msg/.style={-{Stealth[length=2.6mm,open]}, dashed, thick, draw=kfcblue},
+  lbl/.style={font=\sffamily\scriptsize, fill=white, inner sep=1pt}
+]
+% lanes
+\def\W{26.2}
+\draw[thick] (0,0) rectangle (\W,-13.5);
+\draw[thick] (0,-4.5) -- (\W,-4.5);
+\draw[thick] (0,-9) -- (\W,-9);
+\draw[thick] (1.1,0) -- (1.1,-13.5);
+\node[rotate=90, font=\sffamily\bfseries] at (0.55,-2.25) {Developer (user)};
+\node[rotate=90, font=\sffamily\bfseries] at (0.55,-6.75) {Dashboard};
+\node[rotate=90, font=\sffamily\bfseries] at (0.55,-11.25) {Data platform};
+
+% ---- user lane
+\node[start] (s) at (2.2,-2.25) {};
+\node[below=1mm of s, font=\sffamily\scriptsize, align=center] {Needs a trend\\opportunity};
+\node[task, right=0.8cm of s] (u1) {Open Roblox \emph{Trending now} view};
+\node[task, right=0.8cm of u1] (u2) {Filter Roblox games by genre};
+\node[gw, right=0.8cm of u2] (g1) {X};
+\node[above=1mm of g1, font=\sffamily\scriptsize] {Promising game?};
+\node[task, right=0.9cm of g1] (u3) {Open Roblox \emph{Game details}};
+\node[gw, right=0.8cm of u3] (g2) {X};
+\node[anchor=south east, font=\sffamily\scriptsize] at ($(g2.north west)+(-0.15,0.3)$) {Steam match linked?};
+\node[task, above right=0.05cm and 0.8cm of g2] (u4) {Compare matched Roblox games and saturation};
+\node[task, below right=0.05cm and 0.8cm of g2] (u5) {Review game's own metrics and trend};
+\node[gw, right=4.1cm of g2] (g3) {X};
+\node[endev, right=0.8cm of g3] (e) {};
+\node[below=1mm of e, font=\sffamily\scriptsize, align=center] {Opportunity\\assessed};
+
+\draw[flow] (s) -- (u1);
+\draw[flow] (u1) -- (u2);
+\draw[flow] (u2) -- (g1);
+\draw[flow] (g1) -- node[lbl, above]{yes} (u3);
+\draw[flow] (g1.south) -- ++(0,-0.75) -| node[lbl, pos=0.25, below]{no -- refine filters} (u2.south);
+\draw[flow] (u3) -- (g2);
+\draw[flow] (g2.north) |- node[lbl, pos=0.3, left]{yes} (u4.west);
+\draw[flow] (g2.south) |- node[lbl, pos=0.3, left]{no} (u5.west);
+\draw[flow] (u4.east) -| (g3.north);
+\draw[flow] (u5.east) -| (g3.south);
+\draw[flow] (g3) -- (e);
+
+% ---- dashboard lane
+\node[task, below=3.0cm of u2] (d1) {Query ranked list with trend score and projection};
+\node[task, below=3.0cm of u3] (d2) {Load Roblox metrics, history and linked matches};
+\draw[msg] (u2.south) ++(0.4,0) -- ($(d1.north)+(0.4,0)$);
+\draw[msg] ($(d1.north)+(-0.4,0)$) -- ($(u2.south)+(-0.4,0)$);
+\draw[msg] (u3.south) -- (d2.north);
+
+% ---- platform lane
+\node[timer] (t) at (2.2,-11.25) {};
+\node[below=1mm of t, font=\sffamily\scriptsize, align=center] {Every 5 / 15 min};
+\node[task, right=0.8cm of t] (p1) {Poll Roblox and Steam APIs};
+\node[task, right=0.8cm of p1] (p2) {Publish projected records to Kafka};
+\node[task] (p3) at (14,-10.1) {Speed layer: windows, slope, scoring};
+\node[task] (p4) at (14,-12.3) {Batch layer: master dataset, aggregates, model training, clone matching};
+\node[task] (p5) at (20,-11.25) {Update serving\\views\\(PostgreSQL)};
+\node[endev, right=0.8cm of p5] (pe) {};
+\node[below=1mm of pe, font=\sffamily\scriptsize, align=center] {Views\\refreshed};
+\draw[flow] (t) -- (p1);
+\draw[flow] (p1) -- (p2);
+\draw[flow] (p2.east) -- ++(0.7,0) |- (p3.west);
+\draw[flow] (p2.east) -- ++(0.7,0) |- (p4.west);
+\draw[flow] (p3.east) -| (p5.north);
+\draw[flow] (p4.east) -| (p5.south);
+\draw[flow] (p5) -- (pe);
+\draw[msg] (p5.north) -- node[lbl, pos=0.8, right]{serving views} ($(p5.north)+(0,2.05)$) -| (d1.south);
+\draw[msg] ($(p5.north)+(0,2.05)$) -| (d2.south);\end{tikzpicture}

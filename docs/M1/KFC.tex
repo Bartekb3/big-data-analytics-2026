@@ -82,7 +82,7 @@ Only aggregated, public, game-level data is collected. There is no data about in
 
 %======================================================================
 \section{Business process -- core use case}
-Core use case: \textbf{``Find and assess a game trend opportunity''} (Figure~\ref{fig:bpmn} on page~\pageref{fig:bpmn}, BPMN~2.0). The developer browses ranked games, opens a Steam opportunity and inspects its matched Roblox games, then opens an individual game's metrics and history. From a Roblox game's details, the developer can follow each possible Steam counterpart and compare other Roblox games matched to the same Steam game. If there is no match, the page shows the game's own metrics. Matching is fully automatic and indicates possible relationships, not verified copying. The data platform runs independently on a timer.
+Core use case: \textbf{``Find and assess a Steam$\rightarrow$Roblox opportunity''} (Figure~\ref{fig:bpmn} on page~\pageref{fig:bpmn}, BPMN). The developer browses Steam opportunities, filters by genre and opens a Steam game's details to review its trend and observed saturation. If matched Roblox games exist, the developer compares them, selects one and reviews that Roblox game's metrics and player history before assessing the opportunity. With no matches, the assessment uses Steam metrics and the explicit absence of detected matches. Direct Roblox browsing remains available as a separate dashboard entry point. Matching indicates possible relationships, not verified copying. Figure~\ref{fig:interaction-overview} retains the broader user/dashboard/platform overview; it uses conceptual notation rather than formal BPMN.
 
 
 
@@ -152,10 +152,20 @@ The result is about 0.5M rows/day ($\approx$5--8\,MB/day in Parquet), under 1\,G
 \begin{figure}[p]
 \centering
 \resizebox{\linewidth}{!}{\input{diagrams/business-process.tikz.tex}}
-\caption{BPMN business process for finding and assessing a game opportunity. One participant (the developer or analyst); arrows are sequence flows and diamonds are exclusive gateways. Technical stream and batch processing is shown separately in Figure~\ref{fig:dfd}.}
+\caption{BPMN business process for assessing a Steam-to-Roblox opportunity. Steam review precedes matching; Roblox history is reviewed only after selecting a matched Roblox game. One participant (the developer or analyst); arrows are sequence flows and diamonds are exclusive gateways. Technical stream and batch processing is shown separately in Figure~\ref{fig:dfd}.}
 \label{fig:bpmn}
 \end{figure}
 \end{landscape}
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\resizebox{\linewidth}{!}{\input{diagrams/interaction-overview.tikz.tex}}
+\caption{Retained interaction and platform overview (conceptual notation, not formal BPMN). It shows the broader user, dashboard and platform responsibilities, with separate speed and batch paths. Figure~\ref{fig:bpmn} defines the formal core business process.}
+\label{fig:interaction-overview}
+\end{figure}
+\end{landscape}
+
 
 %======================================================================
 \section{Data processing -- high-level data flow}
