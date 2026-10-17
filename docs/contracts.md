@@ -24,7 +24,8 @@ Common fields: `kind`, `ts` (ISO-8601 UTC, producer time), `id` (Roblox `univers
 
 ## Clone matching rules
 
-- `confidence = min(1, title_score + bonus)`, where `title_score` is the normalised fuzzy token-set ratio scaled to 0..1 and `bonus` is a fixed value (start at 0.1) when the Steam title appears in the Roblox `description`. Threshold and bonus are tuned on the manual sample of ~100 pairs.
+- `confidence = w * title_score + (1 - w) * desc_score`, start with `w = 0.5`. `title_score` is the fuzzy token-set ratio of the normalised titles (0..1). `desc_score` is the TF-IDF cosine similarity (0..1) between the Steam `short_description` and the Roblox `description`; the TF-IDF vocabulary/IDF is fitted on the descriptions of the current candidates and their search hits. If either description is empty, `confidence = title_score`. No bonus for the Steam title appearing in the description.
+- Threshold and `w` are tuned on the manual sample of ~100 pairs. `title_score` and `desc_score` are stored so the tuning can be redone without refetching.
 - Hard rule: Roblox `created` must be after the Steam release date.
 - After a successful daily recomputation, matches that are no longer produced are deleted. If a Roblox or Steam API call fails, the run is aborted and the previous `bv_matches` stay unchanged.
 
@@ -46,6 +47,7 @@ CREATE TABLE games (
   name      text NOT NULL,
   genre_l1  text, genre_l2 text,        -- Roblox
   genres    text[],                     -- Steam
+  description text,                     -- Roblox description / Steam short_description (clone matching)
   created   timestamptz,                -- Roblox creation date
   released  date,                       -- Steam release date
   updated   timestamptz,                -- Roblox last update
@@ -106,7 +108,7 @@ CREATE TABLE predictions (
 -- batch outputs
 CREATE TABLE bv_matches (
   steam_id bigint NOT NULL, roblox_id bigint NOT NULL,
-  confidence real NOT NULL, matched_at date NOT NULL,
+  confidence real NOT NULL, title_score real, desc_score real, matched_at date NOT NULL,
   PRIMARY KEY (steam_id, roblox_id)
 );
 

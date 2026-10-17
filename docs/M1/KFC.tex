@@ -116,7 +116,7 @@ Public web APIs. The Games API is documented as a legacy API (\url{https://creat
 \eu{ISteamUserStats/GetNumberOfCurrentPlayers/v1?appid=..} & \ep{player\_count} (1 game per call) & Steam player stream\\
 \eu{ISteamChartsService/GetMostPlayedGames/v1} & \ep{rank, appid, last\_week\_rank, peak\_in\_game} (top 100, daily) & candidate games (charts, used to rank candidates by players)\\
 \eu{store.steampowered.com/search/results/?filter=popularnew} & appid, title, release date (HTML in JSON, 100 per page; \ep{data-ds-appid}, \ep{span.title}, \ep{search\_released}) & full list of recent releases; entries released in the last 90 days are the clone candidates\\
-\eu{store.steampowered.com/api/appdetails?appids=..} & \ep{name, release\_date, genres} & game metadata\\
+\eu{store.steampowered.com/api/appdetails?appids=..} & \ep{name, release\_date, genres, short\_description} & game metadata; description text for clone matching\\
 \bottomrule
 \end{longtable}}
 
@@ -301,8 +301,8 @@ The result is about 0.5M rows/day ($\approx$5--8\,MB/day in Parquet), under 1\,G
       \item \ep{description} and \ep{created} of the hits are fetched from the Roblox games API (they are empty or missing in search results),
       \item titles are normalised (emoji, bracketed tags such as ``[UPD 3]'' and punctuation removed, lower case) and compared with a fuzzy token-set ratio; a short stopword list (``simulator'', ``legends'', \ldots) reduces the weight of generic words,
       \item hard rule: the Roblox game must be created after the Steam release,
-      \item the match confidence is the title score (0--1) plus a fixed bonus when the Steam title appears in the Roblox description, clamped to 1,
-      \item only pairs above a confidence threshold are stored in \ep{bv\_matches} and shown. The threshold and the bonus are tuned on the manual sample below. After a successful daily recomputation, matches that are no longer produced are removed; if the Roblox or Steam API fails, the previous matches are kept. Saturation is the number of clones and their total players.
+      \item the match confidence (0--1) is $w\cdot\text{title score} + (1-w)\cdot\text{description score}$ with $w=0.5$ at the start: the title score is a fuzzy token-set ratio of the normalised titles; the description score is the TF--IDF cosine similarity between the Steam \ep{short\_description} and the Roblox \ep{description} (IDF fitted on the descriptions of the current candidates and their search hits). If either description is empty, the title score alone is used,
+      \item only pairs above a confidence threshold are stored in \ep{bv\_matches} and shown. The threshold and the weight $w$ are tuned on the manual sample below. After a successful daily recomputation, matches that are no longer produced are removed; if the Roblox or Steam API fails, the previous matches are kept. Saturation is the number of clones and their total players.
     \end{itemize}
     Matching precision is evaluated once by the team on a random sample of about 100 pairs.
   \end{itemize}
@@ -385,7 +385,7 @@ Everything runs locally with Docker Compose and needs about 6\,GB of RAM. There 
 Ingestion & Python producers (\ep{requests}, \ep{confluent-kafka}, APScheduler) & Apache NiFi, Kafka Connect\\
 Messaging & Apache Kafka 3.7 (KRaft, single broker) & Redpanda, RabbitMQ\\
 Batch storage & Parquet + Snappy on a Docker volume & HDFS, MinIO (S3); switching only changes the storage path\\
-Batch processing / ML & Apache Spark 3.5 (PySpark, local mode), Spark MLlib; \ep{rapidfuzz} for title matching & Hive, Pandas\\
+Batch processing / ML & Apache Spark 3.5 (PySpark, local mode), Spark MLlib; \ep{rapidfuzz} (titles) and \ep{scikit-learn} TF--IDF (descriptions) for clone matching & Hive, Pandas\\
 Stream processing & Spark Structured Streaming & Apache Flink, Kafka Streams\\
 Scheduling & APScheduler inside the \ep{app} services & Apache Airflow, cron\\
 Serving & PostgreSQL 16 & TimescaleDB, Cassandra\\
