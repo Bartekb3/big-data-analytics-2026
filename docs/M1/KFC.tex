@@ -313,6 +313,39 @@ The result is about 1.2M rows/day ($\approx$10--15\,MB/day in Parquet), under 2\
   \item \textbf{Trend model:} fitted per game on its recent player counts in the speed layer. It gives the growth rate and a +3\,h projection. It is evaluated by MAE against two baselines, ``same as now'' and ``same time yesterday'', and the result is shown in the \emph{Model and data health} view.
 \end{itemize}
 
+\subsection{Data schema}
+
+\textbf{Kafka topics.} Each record contains only the numeric fields needed for the speed layer; string metadata is published to \ep{meta} only on change. All topics use the game/app id as the message key.
+
+{\small
+\begin{longtable}{L{3.4cm} L{4.0cm} L{6.2cm}}
+\toprule
+\textbf{Topic} & \textbf{Key fields} & \textbf{Example values}\\
+\midrule\endhead
+\ep{roblox.snapshots} & \ep{ts, id, playing, visits,}\newline\ep{favorites, up, down} & \ep{ts}=1729208700, \ep{id}=7436755782, \ep{playing}=21\,496\\
+\ep{roblox.sorts} & \ep{ts, country, rank, id,}\newline\ep{playerCount, isSponsored} & \ep{country}=``pl'', \ep{rank}=1\\
+\ep{steam.players} & \ep{ts, appid, player\_count} & \ep{appid}=730, \ep{player\_count}=812\,345\\
+\ep{meta} & \ep{ts, type, id, name,}\newline\ep{genre\_l1, created} & \ep{type}=``roblox'', \ep{name}=``Grow a Garden''\\
+\bottomrule
+\end{longtable}}
+
+\textbf{PostgreSQL serving tables.}
+
+{\small
+\begin{longtable}{L{3.4cm} L{5.5cm} L{4.7cm}}
+\toprule
+\textbf{Table} & \textbf{Columns} & \textbf{Written by}\\
+\midrule\endhead
+\ep{rt\_game\_stats} & \ep{id, ts, playing, visits\_delta,}\newline\ep{growth\_1h, growth\_3h,}\newline\ep{trend\_score, projection\_3h} & speed layer (upsert, 5\,min)\\
+\ep{rt\_ranked} & \ep{id, rank, platform, genre,}\newline\ep{country, ts} & speed layer (upsert, 5\,min)\\
+\ep{bv\_history} & \ep{id, hour\_ts, avg\_playing,}\newline\ep{visits\_delta\_1h} & batch layer (hourly)\\
+\ep{bv\_clones} & \ep{steam\_appid, roblox\_id,}\newline\ep{confidence, matched\_at} & batch layer (daily)\\
+\ep{bv\_saturation} & \ep{genre\_l1, game\_count,}\newline\ep{total\_players, ts\_day} & batch layer (daily)\\
+\ep{game\_meta} & \ep{id, platform, name, genre\_l1,}\newline\ep{genre\_l2, created, updated\_at} & producers (on change)\\
+\ep{model\_coeffs} & \ep{trained\_at, intercept,}\newline\ep{coef\_json} & batch layer (hourly retrain)\\
+\bottomrule
+\end{longtable}}
+
 %======================================================================
 \section{Dashboard}
 Streamlit + Plotly. It shows only what the sources provide. Growth, sparklines, projections and scores appear once enough history has been collected (hours to days).
@@ -399,6 +432,22 @@ Presentation & Streamlit + Plotly & Grafana, Apache Superset\\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+%======================================================================
+\section{Risks and mitigations}
+
+{\small
+\begin{tabularx}{\textwidth}{L{4.2cm} L{2.0cm} Y}
+\toprule
+\textbf{Risk} & \textbf{Likelihood} & \textbf{Mitigation}\\
+\midrule
+Undocumented Roblox endpoints (\ep{explore-api}, \ep{search-api}) change or break & Medium & Fallback to documented legacy \ep{games.roblox.com} for player counts; alert on HTTP\,4xx; UUID \ep{sessionId} is stateless and trivially regenerated.\\
+HTTP\,429 from Roblox (observed after ${\sim}$11 rapid requests) & High -- known & Per-endpoint back-off with jitter; batching up to 50 IDs per call; 1\,s sleep between batch groups.\\
+Steam / SteamSpy throttling & Low & 0.5\,s sleep between per-game calls; store and \ep{appdetails} polled at daily cadence only.\\
+Spark local-mode OOM on large micro-batches & Medium & \ep{spark.driver.memory 2g}; 5-min trigger limits in-flight data; \ep{maxOffsetsPerTrigger} for backpressure.\\
+Clone matching false positives above threshold & Medium & Manual spot-check on ${\sim}$100 randomly sampled pairs before final demo; confidence threshold tunable in \ep{model\_coeffs}.\\
+\bottomrule
+\end{tabularx}}
 
 %======================================================================
 \section{Planned use of GenAI tools}
