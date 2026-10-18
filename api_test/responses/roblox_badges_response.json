@@ -14,9 +14,9 @@
       "created": "2025-04-07T22:29:09.644+00:00",
       "updated": "2025-04-07T22:29:09.644+00:00",
       "statistics": {
-        "pastDayAwardedCount": 118004,
-        "awardedCount": 515836963,
-        "winRatePercentage": 0.272
+        "pastDayAwardedCount": 162443,
+        "awardedCount": 515914246,
+        "winRatePercentage": 0.276
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -36,9 +36,9 @@
       "created": "2025-04-07T22:29:31.482+00:00",
       "updated": "2025-04-07T22:29:31.482+00:00",
       "statistics": {
-        "pastDayAwardedCount": 118229,
-        "awardedCount": 515073841,
-        "winRatePercentage": 0.272
+        "pastDayAwardedCount": 162821,
+        "awardedCount": 515151366,
+        "winRatePercentage": 0.276
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -58,9 +58,9 @@
       "created": "2025-04-07T22:29:46.373+00:00",
       "updated": "2025-04-07T22:29:46.373+00:00",
       "statistics": {
-        "pastDayAwardedCount": 118376,
-        "awardedCount": 517163640,
-        "winRatePercentage": 0.272
+        "pastDayAwardedCount": 163124,
+        "awardedCount": 517241354,
+        "winRatePercentage": 0.277
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -80,9 +80,9 @@
       "created": "2025-04-07T22:29:59.686+00:00",
       "updated": "2025-04-07T22:30:58.271+00:00",
       "statistics": {
-        "pastDayAwardedCount": 118501,
-        "awardedCount": 517487818,
-        "winRatePercentage": 0.273
+        "pastDayAwardedCount": 163309,
+        "awardedCount": 517565591,
+        "winRatePercentage": 0.277
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -102,9 +102,9 @@
       "created": "2025-04-07T22:30:12.917+00:00",
       "updated": "2025-04-07T22:30:12.917+00:00",
       "statistics": {
-        "pastDayAwardedCount": 118571,
-        "awardedCount": 517722150,
-        "winRatePercentage": 0.273
+        "pastDayAwardedCount": 163440,
+        "awardedCount": 517800001,
+        "winRatePercentage": 0.277
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -124,9 +124,9 @@
       "created": "2025-04-07T22:30:22.555+00:00",
       "updated": "2025-04-07T22:31:11.221+00:00",
       "statistics": {
-        "pastDayAwardedCount": 118640,
-        "awardedCount": 517970617,
-        "winRatePercentage": 0.273
+        "pastDayAwardedCount": 163577,
+        "awardedCount": 518048585,
+        "winRatePercentage": 0.278
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -146,9 +146,9 @@
       "created": "2025-04-14T22:51:58.849+00:00",
       "updated": "2025-04-14T22:51:58.849+00:00",
       "statistics": {
-        "pastDayAwardedCount": 9338,
-        "awardedCount": 120588941,
-        "winRatePercentage": 0.021
+        "pastDayAwardedCount": 13381,
+        "awardedCount": 120595591,
+        "winRatePercentage": 0.023
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -168,9 +168,9 @@
       "created": "2025-04-14T22:52:25.926+00:00",
       "updated": "2025-04-14T22:52:25.926+00:00",
       "statistics": {
-        "pastDayAwardedCount": 12672,
-        "awardedCount": 149564017,
-        "winRatePercentage": 0.029
+        "pastDayAwardedCount": 16191,
+        "awardedCount": 149570643,
+        "winRatePercentage": 0.027
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -190,9 +190,9 @@
       "created": "2025-04-14T22:52:46.023+00:00",
       "updated": "2025-04-14T22:52:46.023+00:00",
       "statistics": {
-        "pastDayAwardedCount": 7213,
-        "awardedCount": 114514386,
-        "winRatePercentage": 0.017
+        "pastDayAwardedCount": 8982,
+        "awardedCount": 114519001,
+        "winRatePercentage": 0.015
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -212,9 +212,9 @@
       "created": "2025-04-14T22:53:52.837+00:00",
       "updated": "2025-04-14T22:53:52.837+00:00",
       "statistics": {
-        "pastDayAwardedCount": 7361,
-        "awardedCount": 128134412,
-        "winRatePercentage": 0.017
+        "pastDayAwardedCount": 8891,
+        "awardedCount": 128138135,
+        "winRatePercentage": 0.015
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -234,9 +234,9 @@
       "created": "2025-04-14T22:54:35.108+00:00",
       "updated": "2025-04-14T22:54:35.108+00:00",
       "statistics": {
-        "pastDayAwardedCount": 91838,
-        "awardedCount": 417321584,
-        "winRatePercentage": 0.211
+        "pastDayAwardedCount": 122355,
+        "awardedCount": 417377940,
+        "winRatePercentage": 0.208
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -256,9 +256,9 @@
       "created": "2025-04-14T22:54:58.595+00:00",
       "updated": "2025-04-14T22:54:58.595+00:00",
       "statistics": {
-        "pastDayAwardedCount": 42591,
-        "awardedCount": 235971121,
-        "winRatePercentage": 0.098
+        "pastDayAwardedCount": 51245,
+        "awardedCount": 235991546,
+        "winRatePercentage": 0.087
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -278,9 +278,9 @@
       "created": "2025-04-14T22:57:07.211+00:00",
       "updated": "2025-04-14T23:14:10.196+00:00",
       "statistics": {
-        "pastDayAwardedCount": 5407,
-        "awardedCount": 97876185,
-        "winRatePercentage": 0.012
+        "pastDayAwardedCount": 6711,
+        "awardedCount": 97879156,
+        "winRatePercentage": 0.011
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -300,8 +300,8 @@
       "created": "2025-04-14T23:10:51.559+00:00",
       "updated": "2025-04-14T23:10:51.559+00:00",
       "statistics": {
-        "pastDayAwardedCount": 222,
-        "awardedCount": 5351519,
+        "pastDayAwardedCount": 302,
+        "awardedCount": 5351665,
         "winRatePercentage": 0.001
       },
       "awardingUniverse": {
@@ -322,9 +322,9 @@
       "created": "2025-04-14T23:11:34.522+00:00",
       "updated": "2025-04-14T23:11:34.522+00:00",
       "statistics": {
-        "pastDayAwardedCount": 13258,
-        "awardedCount": 124003247,
-        "winRatePercentage": 0.031
+        "pastDayAwardedCount": 15431,
+        "awardedCount": 124009212,
+        "winRatePercentage": 0.026
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -344,8 +344,8 @@
       "created": "2025-04-14T23:12:03.169+00:00",
       "updated": "2025-04-14T23:12:03.169+00:00",
       "statistics": {
-        "pastDayAwardedCount": 820,
-        "awardedCount": 139878759,
+        "pastDayAwardedCount": 1225,
+        "awardedCount": 139879423,
         "winRatePercentage": 0.002
       },
       "awardingUniverse": {
@@ -366,9 +366,9 @@
       "created": "2025-04-14T23:12:37.689+00:00",
       "updated": "2025-04-14T23:12:37.689+00:00",
       "statistics": {
-        "pastDayAwardedCount": 15477,
-        "awardedCount": 171029134,
-        "winRatePercentage": 0.036
+        "pastDayAwardedCount": 19326,
+        "awardedCount": 171037415,
+        "winRatePercentage": 0.033
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -388,9 +388,9 @@
       "created": "2025-04-14T23:13:19.265+00:00",
       "updated": "2025-04-14T23:13:51.972+00:00",
       "statistics": {
-        "pastDayAwardedCount": 680,
-        "awardedCount": 24540788,
-        "winRatePercentage": 0.002
+        "pastDayAwardedCount": 725,
+        "awardedCount": 24541051,
+        "winRatePercentage": 0.001
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -410,7 +410,7 @@
       "created": "2025-08-20T02:14:34.715+00:00",
       "updated": "2025-08-22T20:48:55.182+00:00",
       "statistics": {
-        "pastDayAwardedCount": 2,
+        "pastDayAwardedCount": 1,
         "awardedCount": 94186,
         "winRatePercentage": 0.0
       },
@@ -432,8 +432,8 @@
       "created": "2025-08-20T02:15:18.183+00:00",
       "updated": "2025-08-22T20:48:43.193+00:00",
       "statistics": {
-        "pastDayAwardedCount": 288,
-        "awardedCount": 4557215,
+        "pastDayAwardedCount": 375,
+        "awardedCount": 4557391,
         "winRatePercentage": 0.001
       },
       "awardingUniverse": {
@@ -454,8 +454,8 @@
       "created": "2025-08-20T02:15:43.133+00:00",
       "updated": "2025-08-22T20:48:31.568+00:00",
       "statistics": {
-        "pastDayAwardedCount": 236,
-        "awardedCount": 2917434,
+        "pastDayAwardedCount": 359,
+        "awardedCount": 2917644,
         "winRatePercentage": 0.001
       },
       "awardingUniverse": {
@@ -476,9 +476,9 @@
       "created": "2025-08-20T02:17:07.362+00:00",
       "updated": "2025-08-22T20:48:17.566+00:00",
       "statistics": {
-        "pastDayAwardedCount": 19739,
-        "awardedCount": 37857435,
-        "winRatePercentage": 0.045
+        "pastDayAwardedCount": 25363,
+        "awardedCount": 37869215,
+        "winRatePercentage": 0.043
       },
       "awardingUniverse": {
         "id": 7436755782,
@@ -498,9 +498,9 @@
       "created": "2026-10-15T20:11:32.942+00:00",
       "updated": "2026-10-16T21:49:40.876+00:00",
       "statistics": {
-        "pastDayAwardedCount": 0,
-        "awardedCount": 0,
-        "winRatePercentage": 0.0
+        "pastDayAwardedCount": 41221,
+        "awardedCount": 46052,
+        "winRatePercentage": 0.07
       },
       "awardingUniverse": {
         "id": 7436755782,
