@@ -70,21 +70,19 @@ Roblox is a trend-driven game platform with a very young audience (mostly 10--15
 \begin{itemize}
   \item \textbf{Dashboard} (web app) with four views:
   \begin{itemize}
-    \item \emph{Trending now}: Roblox/Steam games ranked by trend score, with players, growth and a +3\,h projection; filters by genre and country.
-    \item \emph{Steam$\rightarrow$Roblox opportunities}: trending Steam games released in the last 90 days, their automatically matched Roblox clones (with match confidence) and a saturation indicator.
-    \item \emph{Game details}: metrics, player time series, linked Steam original and the timeline of its Roblox clones.
-    \item \emph{Model and data health}: model accuracy compared with simple baselines, data freshness and API errors.
+    \item \emph{Steam$\rightarrow$Roblox opportunities} (entry point of the core use case): trending Steam games released in the last 90 days with 1\,h/3\,h/24\,h growth, their automatically matched Roblox games (with match confidence) and a saturation indicator (number of matched games and their total players). Open a Steam opportunity to inspect its matched games, then select any Roblox game to open its details.
+    \item \emph{Trending now}: Roblox games ranked by trend score and Steam games ranked by growth, with current players, growth and a +3\,h projection; filter by genre.
+    \item \emph{Game details}: metrics, player time series and linked possible Steam counterparts. For each linked Steam game, browse other Roblox games matched to it, with clickable names, current players, growth, creation dates and match confidence.
+    \item \emph{Model and data health}: projection error (MAE) compared with simple baselines, data freshness and API errors.
   \end{itemize}
   \item \textbf{Data platform} in a lambda architecture, run locally with \texttt{docker compose up}.
-  \item \textbf{ML models:} a model that estimates how many players a game should have (the difference from the actual count is the trend score) and a trend model for short-term projection.
+  \item \textbf{ML models} (two linear regressions in Spark MLlib): an expected players model for Roblox (the ratio of actual to expected players is the trend score) and a +3\,h player projection that uses the hour of day, evaluated against the ``same as now'' and ``same time yesterday'' baselines.
 \end{itemize}
 Only aggregated, public, game-level data is collected. There is no data about individual players.
 
 %======================================================================
 \section{Business process -- core use case}
-Core use case: \textbf{``Find and assess a game trend opportunity''} (Figure~\ref{fig:bpmn} on page~\pageref{fig:bpmn}, BPMN~2.0). The developer browses ranked games, drills into one, and checks its Steam origin (release date, Roblox clones, saturation) or similar Roblox games. Steam$\rightarrow$Roblox matching is fully automatic. The data platform runs independently on a timer.
-
-
+Core use case: \textbf{``Find and assess a Steam$\rightarrow$Roblox opportunity''}. Figure~\ref{fig:bpmn} (page~\pageref{fig:bpmn}) shows it in BPMN; Figure~\ref{fig:interaction-overview} shows the same flow across the user, dashboard and data platform. The developer opens the Steam opportunities, filters by genre and opens a promising Steam game to review its growth and saturation. If matched Roblox games exist, the developer compares them, opens one and reviews its player history, trend score and projection; otherwise the assessment relies on Steam growth and the absence of detected matches. \emph{Trending now} supports ad-hoc browsing but is not part of the core flow. Matching indicates possible counterparts, not verified copying.
 
 %======================================================================
 \section{Data sources -- preliminary investigation}
@@ -98,10 +96,10 @@ Public web APIs. The Games API is documented as a legacy API (\url{https://creat
 \toprule
 \textbf{Endpoint} & \textbf{Attributes used} & \textbf{Purpose}\\
 \midrule\endhead
-\eu{apis.roblox.com/explore-api/v1/get-sorts?country=XX} & \ep{universeId, name, playerCount, totalUpVotes, totalDownVotes, isSponsored, genreL1}; 28 ranking lists per country & discovery of game IDs, per-country rank, cheap player counts\\
-\eu{apis.roblox.com/search-api/omni-search?searchQuery=..} & \ep{universeId, name, description, playerCount, creatorId} (40 per query) & finding Roblox counterparts of Steam games\\
-\eu{games.roblox.com/v1/games?universeIds=..} (50 IDs) & \ep{playing, visits, favoritedCount, maxPlayers, created, updated, genre\_l1, genre\_l2, creator} & core snapshot: concurrent players, cumulative visits, update events\\
-\eu{games.roblox.com/v1/games/votes?universeIds=..} & \ep{upVotes, downVotes} & like ratio (model feature)\\
+\eu{apis.roblox.com/explore-api/v1/get-sorts?country=XX} & \ep{universeId, name, playerCount, totalUpVotes, totalDownVotes, isSponsored, genreL1}; several ranking lists per country, paged with \ep{nextSortsPageToken} & discovery of game IDs (3 countries), cheap player counts and votes for listed games\\
+\eu{apis.roblox.com/search-api/omni-search?searchQuery=..} & \ep{universeId, name, description, playerCount, creatorId} (40 per query) & finding Roblox counterparts of Steam games (top 10--20 hits per query; \ep{description} is empty here)\\
+\eu{games.roblox.com/v1/games?universeIds=..} (50 IDs) & \ep{playing, visits, favoritedCount, maxPlayers, created, updated, genre\_l1, genre\_l2, creator} & core snapshot: concurrent players, cumulative visits, last update; also \ep{description} and \ep{created} for clone matching\\
+\eu{games.roblox.com/v1/games/votes?universeIds=..} & \ep{upVotes, downVotes} & like ratio (model feature); called in the same 50-ID loop as games\\
 \bottomrule
 \end{longtable}}
 
@@ -114,9 +112,9 @@ Public web APIs. The Games API is documented as a legacy API (\url{https://creat
 \textbf{Endpoint} & \textbf{Attributes used} & \textbf{Purpose}\\
 \midrule\endhead
 \eu{ISteamUserStats/GetNumberOfCurrentPlayers/v1?appid=..} & \ep{player\_count} (1 game per call) & Steam player stream\\
-\eu{ISteamChartsService/GetMostPlayedGames/v1} & \ep{rank, appid, last\_week\_rank, peak\_in\_game} (top 100, daily) & candidate games\\
-\eu{store.steampowered.com/search/results/?filter=popularnew} & appid, title, release date (HTML in JSON, 100 per page) & recent releases, i.e.\ candidates for clone matching\\
-\eu{store.steampowered.com/api/appdetails?appids=..} & \ep{name, release\_date, genres} & game metadata\\
+\eu{ISteamChartsService/GetMostPlayedGames/v1} & \ep{rank, appid, last\_week\_rank, peak\_in\_game} (top 100, daily) & candidate games (charts, used to rank candidates by players)\\
+\eu{store.steampowered.com/search/results/?filter=popularnew} & appid, title, release date (HTML in JSON, 100 per page; \ep{data-ds-appid}, \ep{span.title}, \ep{search\_released}) & full list of recent releases; entries released in the last 90 days are the clone candidates\\
+\eu{store.steampowered.com/api/appdetails?appids=..} & \ep{name, release\_date, genres, short\_description} & game metadata; description text for clone matching\\
 \bottomrule
 \end{longtable}}
 
@@ -127,26 +125,44 @@ Public web APIs. The Games API is documented as a legacy API (\url{https://creat
 \toprule
 \textbf{Feed} & \textbf{Measured} & \textbf{Planned read} & \textbf{Rows/day}\\
 \midrule
-Roblox ranking lists & 60 requests $\rightarrow$ 1,583 unique games (12 countries), $\sim$100\,kB/response, no throttling & every 15 min & $\sim$345k\\
-Roblox game snapshots & $\sim$1.4\,kB/record; within 60\,s, \ep{playing} changed for 82\% and \ep{visits} for 94\% of games; HTTP 429 after $\sim$11 rapid requests & every 5 min, $\le$2,000 games & 576k\\
-Roblox votes & 2,060 games in 30\,s without throttling; 25\% change per minute & every 15 min & 192k\\
-Roblox search & 40 results/query & daily (clone candidates) & $<$4k\\
-Steam current players & median 0.36\,s/call, about 100k calls/day allowed & every 15 min, $\le$500 games & 48k\\
-Steam charts, store & top 100; 379 popular new releases; appdetails about 200 req/5 min & daily / new game & small\\
+Roblox ranking lists & 60 requests $\rightarrow$ 1,583 unique games (12 countries probed), $\sim$100\,kB/response, no throttling; 3 countries kept & every 15 min & $\sim$90k\\
+Roblox game snapshots & $\sim$1.4\,kB/record; within 60\,s, \ep{playing} changed for 82\% and \ep{visits} for 94\% of games; HTTP 429 after $\sim$11 rapid requests & top $\sim$500 every 5 min, the rest ($\le$1,000) every 15 min & $\sim$240k\\
+Roblox votes & 2,060 games in 30\,s without throttling & every 15 min, same loop as games, $\le$1,500 games & $\sim$144k\\
+Roblox search & 40 results/query & daily, one query per new Steam game (about 40--80) & $<$1k\\
+Steam current players & median 0.36\,s/call, about 100k calls/day allowed & every 15 min, $\le$300 games & $\sim$29k\\
+Steam charts, store, appdetails & top 100; 379 popular new releases (10--20\% within 90 days); appdetails about 200 req/5 min & daily / new game & small\\
 \bottomrule
 \end{tabularx}
-\caption{Base characteristics. All data is semi-structured JSON over HTTPS (REST polling). Average velocity is about 400--800 records/min.}
+\caption{Base characteristics. All data is semi-structured JSON over HTTPS (REST polling). Average velocity is about 350 records/min.}
 \end{table}
 
-\textbf{Volume reduction.} Raw JSON would be about 1.4\,GB/day. We keep it much smaller:
+\textbf{Volume reduction.} Raw JSON would be roughly 0.5\,GB/day. We keep it much smaller:
 \begin{itemize}
-  \item producers keep only numeric fields (fact row \ep{ts, id, playing, visits, favorites, up, down}, about 50\,B),
-  \item metadata is stored once and updated only on change,
-  \item Kafka keeps raw messages for 24\,h,
+  \item producers keep only the needed fields (game row \ep{ts, id, playing, visits, favorites, updated}, about 50\,B),
+  \item metadata is sent as \ep{kind=meta} records only when it changes,
+  \item Kafka keeps raw messages for 72\,h,
   \item the master dataset is stored as Snappy-compressed Parquet,
-  \item the serving DB keeps 5-min data for 14 days and hourly aggregates after that.
+  \item the serving DB keeps 5-min rows for 14 days (time-based retention) and hourly aggregates computed by the batch layer for the whole project.
 \end{itemize}
-The result is about 1.2M rows/day ($\approx$10--15\,MB/day in Parquet), under 2\,GB per semester.
+The master dataset is about 0.5M source events/day ($\approx$5--8\,MB/day in Parquet), under 1\,GB per semester. Serving tables, indexes, checkpoints and Kafka retention come on top of this; total disk usage will be measured.
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\resizebox{\linewidth}{!}{\input{diagrams/business-process.tikz.tex}}
+\caption{BPMN business process for assessing a Steam-to-Roblox opportunity. Steam review precedes matching; Roblox history is reviewed only after selecting a matched Roblox game. One participant (the developer or analyst); arrows are sequence flows and diamonds are exclusive gateways. Technical stream and batch processing is shown in Figure~\ref{fig:dfd}.}
+\label{fig:bpmn}
+\end{figure}
+\end{landscape}
+
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\resizebox{\linewidth}{!}{\input{diagrams/interaction-overview.tikz.tex}}
+\caption{The same core use case as Figure~\ref{fig:bpmn} across the user, dashboard and data platform (conceptual notation, not formal BPMN), with separate speed and batch paths.}
+\label{fig:interaction-overview}
+\end{figure}
+\end{landscape}
 
 \begin{landscape}
 \begin{figure}[p]
@@ -154,201 +170,114 @@ The result is about 1.2M rows/day ($\approx$10--15\,MB/day in Parquet), under 2\
 \resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[
   font=\sffamily\small,
-  task/.style={rectangle, rounded corners=4pt, draw=kfcgray, fill=white, thick, minimum width=2.9cm, minimum height=1.15cm, align=center, text width=2.7cm},
-  start/.style={circle, draw=kfcteal, thick, minimum size=0.75cm, fill=lightteal},
-  timer/.style={circle, draw=kfcteal, double, thick, minimum size=0.75cm, fill=lightteal},
-  endev/.style={circle, draw=red!60!black, line width=2.2pt, minimum size=0.75cm, fill=red!8},
-  gw/.style={diamond, draw=kfcpurple, thick, fill=lightpurple, minimum size=1.05cm, inner sep=0pt, font=\sffamily\bfseries},
-  flow/.style={-{Stealth[length=2.6mm]}, thick, draw=kfcgray},
-  msg/.style={-{Stealth[length=2.6mm,open]}, dashed, thick, draw=kfcblue},
-  lbl/.style={font=\sffamily\scriptsize, fill=white, inner sep=1pt}
-]
-% lanes
-\def\W{24.6}
-\draw[thick] (0,0) rectangle (\W,-13.5);
-\draw[thick] (0,-4.5) -- (\W,-4.5);
-\draw[thick] (0,-9) -- (\W,-9);
-\draw[thick] (1.1,0) -- (1.1,-13.5);
-\node[rotate=90, font=\sffamily\bfseries] at (0.55,-2.25) {Developer (user)};
-\node[rotate=90, font=\sffamily\bfseries] at (0.55,-6.75) {Dashboard};
-\node[rotate=90, font=\sffamily\bfseries] at (0.55,-11.25) {Data platform};
-
-% ---- user lane
-\node[start] (s) at (2.2,-2.25) {};
-\node[below=1mm of s, font=\sffamily\scriptsize, align=center] {Needs a trend\\opportunity};
-\node[task, right=0.8cm of s] (u1) {Open \emph{Trending now} view};
-\node[task, right=0.8cm of u1] (u2) {Filter by platform, genre, country};
-\node[gw, right=0.8cm of u2] (g1) {X};
-\node[above=1mm of g1, font=\sffamily\scriptsize] {Promising game?};
-\node[task, right=0.9cm of g1] (u3) {Open \emph{Game details}};
-\node[gw, right=0.8cm of u3] (g2) {X};
-\node[anchor=south east, font=\sffamily\scriptsize] at ($(g2.north west)+(-0.15,0.3)$) {Steam origin linked?};
-\node[task, above right=0.05cm and 0.8cm of g2] (u4) {Review timeline and saturation};
-\node[task, below right=0.05cm and 0.8cm of g2] (u5) {Review similar Roblox games};
-\node[gw, right=4.1cm of g2] (g3) {X};
-\node[endev, right=0.8cm of g3] (e) {};
-\node[below=1mm of e, font=\sffamily\scriptsize, align=center] {Opportunity\\assessed};
-
-\draw[flow] (s) -- (u1);
-\draw[flow] (u1) -- (u2);
-\draw[flow] (u2) -- (g1);
-\draw[flow] (g1) -- node[lbl, above]{yes} (u3);
-\draw[flow] (g1.south) -- ++(0,-0.75) -| node[lbl, pos=0.25, below]{no -- refine filters} (u2.south);
-\draw[flow] (u3) -- (g2);
-\draw[flow] (g2.north) |- node[lbl, pos=0.3, left]{yes} (u4.west);
-\draw[flow] (g2.south) |- node[lbl, pos=0.3, left]{no} (u5.west);
-\draw[flow] (u4.east) -| (g3.north);
-\draw[flow] (u5.east) -| (g3.south);
-\draw[flow] (g3) -- (e);
-
-% ---- dashboard lane
-\node[task, below=3.0cm of u2] (d1) {Query ranked list with trend score and projection};
-\node[task, below=3.0cm of u3] (d2) {Load time series, metrics, Steam origin and clones};
-\draw[msg] (u2.south) ++(0.4,0) -- ($(d1.north)+(0.4,0)$);
-\draw[msg] ($(d1.north)+(-0.4,0)$) -- ($(u2.south)+(-0.4,0)$);
-\draw[msg] (u3.south) -- (d2.north);
-
-% ---- platform lane
-\node[timer] (t) at (2.2,-11.25) {};
-\node[below=1mm of t, font=\sffamily\scriptsize, align=center] {Every 5 / 15 min};
-\node[task, right=0.8cm of t] (p1) {Poll Roblox and Steam APIs};
-\node[task, right=0.8cm of p1] (p2) {Publish projected records to Kafka};
-\node[task, right=0.8cm of p2] (p3) {Speed layer: windows, trend line, scoring};
-\node[task, right=0.8cm of p3] (p4) {Batch layer: master dataset, aggregates, model training, clone matching};
-\node[task, right=0.8cm of p4] (p5) {Update serving\\views\\(PostgreSQL)};
-\node[endev, right=0.8cm of p5] (pe) {};
-\node[below=1mm of pe, font=\sffamily\scriptsize, align=center] {Views\\refreshed};
-\draw[flow] (t) -- (p1);
-\draw[flow] (p1) -- (p2);
-\draw[flow] (p2) -- (p3);
-\draw[flow] (p3) -- (p4);
-\draw[flow] (p4) -- (p5);
-\draw[flow] (p5) -- (pe);
-\draw[msg] (p5.north) -- node[lbl, pos=0.8, right]{serving views} ($(p5.north)+(0,2.05)$) -| (d1.south);
-\draw[msg] ($(p5.north)+(0,2.05)$) -| (d2.south);\end{tikzpicture}
-}
-\caption{BPMN 2.0 diagram of the core use case. Solid arrows: sequence flow; dashed arrows: message/data flow; diamonds: exclusive gateways.}
-\label{fig:bpmn}
-\end{figure}
-\end{landscape}
-
-%======================================================================
-\section{Data processing -- high-level data flow}
-\begin{figure}[H]
-\centering
-\resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[
-  font=\sffamily\small,
-  box/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1!8, thick, align=center, minimum height=1.1cm, text width=3.2cm},
+  box/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1!8, thick, align=center, minimum height=1.2cm, text width=3.2cm},
   box/.default=kfcgray,
-  db/.style={cylinder, shape border rotate=90, aspect=0.18, draw=#1, fill=#1!8, thick, align=center, minimum height=1.3cm, text width=2.9cm},
+  db/.style={cylinder, shape border rotate=90, aspect=0.18, draw=#1, fill=#1!8, thick, align=center, minimum height=1.4cm, text width=2.9cm},
   db/.default=kfcgray,
   arr/.style={-{Stealth[length=2.6mm]}, thick, draw=kfcgray},
-  note/.style={font=\sffamily\scriptsize, align=left, text width=4.2cm, text=kfcgray}
+  lab/.style={font=\sffamily\small, fill=white, inner sep=1.5pt},
+  note/.style={font=\sffamily\small, align=left, text=kfcgray}
 ]
 % sources
-\node[box=kfcpurple] (rb) at (0,2.1) {\textbf{Roblox web APIs}\\ranking lists, games,\\votes, search};
-\node[box=kfcpurple] (st) at (0,-0.9) {\textbf{Steam APIs}\\players, charts,\\store search, details};
+\node[box=kfcpurple] (rb) at (0,2.4) {\textbf{Roblox web APIs}\\ranking lists, games,\\votes, search};
+\node[box=kfcpurple] (st) at (0,-1.2) {\textbf{Steam APIs}\\players, charts,\\store search, details};
 % ingestion
-\node[box=kfcblue] (prod) at (4.6,0.6) {\textbf{Python producers}\\scheduler, rate limiter,\\retry, schema check,\\\emph{projection}};
-\node[db=kfcblue] (kafka) at (8.9,0.6) {\textbf{Apache Kafka}\\topics per feed,\\24 h retention};
+\node[box=kfcblue] (prod) at (5.0,0.6) {\textbf{Python producers}\\one service,\\rate limiter, retry};
+\node[db=kfcblue] (kafka) at (11.0,0.6) {\textbf{Apache Kafka}\\2 topics (\texttt{kind}),\\72 h retention};
 % speed layer
-\node[box=kfcteal, text width=3.6cm] (speed) at (13.6,3.6) {\textbf{Speed layer}\\Spark Structured\\Streaming};
+\node[box=kfcteal, text width=3.6cm] (speed) at (17.6,3.8) {\textbf{Speed layer}\\Spark Structured\\Streaming};
 % batch layer
-\node[db=kfcteal] (hdfs) at (12.4,-2.2) {\textbf{Master dataset}\\Parquet on a Docker\\volume, append-only};
-\node[box=kfcteal, text width=3.6cm] (batch) at (16.6,-2.2) {\textbf{Batch layer}\\Spark batch jobs\\(hourly / daily)};
+\node[db=kfcteal] (hdfs) at (14.2,-2.4) {\textbf{Master dataset}\\Parquet on a Docker\\volume, append-only};
+\node[box=kfcteal, text width=3.6cm] (batch) at (19.0,-2.4) {\textbf{Batch layer}\\Spark batch jobs\\(hourly / daily)};
 % serving
-\node[db=kfcblue, text width=3.3cm] (pg) at (20.6,0.6) {\textbf{Serving layer}\\PostgreSQL\\real-time + batch views};
-\node[box=kfcpurple, text width=2.8cm] (dash) at (24.6,0.6) {\textbf{Dashboard}\\Streamlit + Plotly};
+\node[db=kfcblue, text width=3.3cm] (pg) at (24.0,0.6) {\textbf{Serving layer}\\PostgreSQL};
+\node[box=kfcpurple, text width=2.8cm] (dash) at (28.4,0.6) {\textbf{Dashboard}\\Streamlit + Plotly};
 
 \draw[arr] (rb.east) -- (prod.north west);
 \draw[arr] (st.east) -- (prod.south west);
-\draw[arr] (prod) -- node[above, font=\sffamily\scriptsize]{JSON records} (kafka);
+\draw[arr] (prod) -- node[lab, above=2pt]{JSON records} (kafka);
 \draw[arr] (kafka.north) |- (speed.west);
-\draw[arr] (kafka.south) |- node[pos=0.75, below, font=\sffamily\scriptsize]{hourly sink job} (hdfs.west);
+\draw[arr] (kafka.south) |- node[lab, pos=0.75, below=2pt]{hourly sink} (hdfs.west);
 \draw[arr] (hdfs) -- (batch);
-\draw[arr] (speed.east) -| node[pos=0.25, above, font=\sffamily\scriptsize]{real-time views (upsert)} (pg.north);
-\draw[arr] (batch.east) -| node[pos=0.25, below, font=\sffamily\scriptsize]{batch views} (pg.south);
-\draw[arr, dashed, draw=kfcteal] (batch.north) -- node[right, font=\sffamily\scriptsize, align=left]{model\\coefficients} (speed.south -| batch.north);
+\draw[arr] (speed.east) -| node[lab, pos=0.3, above=2pt]{5-min rows} (pg.north);
+\draw[arr] (batch.east) -| node[lab, pos=0.3, below=2pt]{hourly aggregates, matches} (pg.south);
+\draw[arr, dashed, draw=kfcteal] (batch.north) -- node[lab, left=2pt, align=right]{model coefficients\\(via PostgreSQL)} (speed.south -| batch.north);
 \draw[arr] (pg) -- (dash);
 
-\node[note, above=0.15cm of speed, text width=6.2cm] {per 5-min micro-batch: dedup, new visits = $\Delta$visits, 1 h / 3 h growth, trend model +3 h projection, trend score with coefficients from \texttt{model\_coeffs}};
-\node[note, below=0.15cm of batch, text width=6.4cm] {hourly: sink to Parquet, aggregates, retrain expected players model; daily: Steam$\to$Roblox matching, genre saturation, retention};
-\node[note, below=0.15cm of prod, text width=3.6cm] {keeps only needed fields; metadata only on change};
+\node[note, above=0.25cm of speed, text width=6.4cm] {every 5 min: dedup, visit deltas, growth,\\Roblox trend score, +3 h projection};
+\node[note, below=0.25cm of batch, text width=7.4cm] {hourly: Parquet sink, hourly aggregates, delete\\5-min rows older than 14 days, train and evaluate\\models; daily: tracked list, matching, saturation};
+\node[note, below=0.25cm of prod, text width=3.8cm] {only needed fields;\\metadata as \texttt{kind=meta}};
 \end{tikzpicture}
 }
 \caption{High-level data flow (lambda architecture).}
 \label{fig:dfd}
 \end{figure}
+\end{landscape}
 
-\textbf{Key assumptions.}
+%======================================================================
+\section{Data processing -- high-level data flow}
+Figure~\ref{fig:dfd} (page~\pageref{fig:dfd}) shows the data flow. Each layer in short (deduplication keys, time buckets, partial-update rules, payloads and table schemas are in \ep{docs/contracts.md}):
 \begin{itemize}
-  \item \textbf{Ingestion:} two producers (\ep{producer-roblox}, \ep{producer-steam}) with a scheduler, rate limiter, back-off on 429/5xx, schema check and field projection. Kafka topics: \ep{roblox.snapshots} (game stats and votes), \ep{roblox.sorts}, \ep{steam.players} and \ep{meta}, keyed by game ID, with 24\,h retention. The tracked set is games seen in ranking lists in the last 7 days plus clone candidates, capped at about 2,000 games.
-  \item \textbf{Speed layer} (\ep{speed-job}: Spark Structured Streaming, local mode, 5-min trigger):
-  \begin{itemize}
-    \item deduplicate and validate records,
-    \item compute new visits ($\Delta$visits) and 1\,h/3\,h growth,
-    \item compute the trend model projection,
-    \item compute the trend score with the latest coefficients from \ep{model\_coeffs},
-    \item upsert the real-time views \ep{rt\_*}.
-  \end{itemize}
-  \item \textbf{Batch layer} (\ep{batch-sink} and \ep{batch-jobs}, scheduled inside the app image, no external orchestrator):
-  \begin{itemize}
-    \item \emph{hourly:} Kafka $\rightarrow$ append-only Parquet master dataset (Structured Streaming with \ep{availableNow} trigger and checkpoint, so nothing is lost or duplicated); aggregates and 24\,h/7\,d changes; retraining of the expected players model and saving of its coefficients to \ep{model\_coeffs},
-    \item \emph{daily:} genre saturation, retention, and fully automatic Steam$\rightarrow$Roblox clone matching:
-    \begin{itemize}
-      \item candidates are Steam games released in the last 90 days with growing player counts; their titles are searched in the Roblox search API,
-      \item hard rule: the Roblox game must be created after the Steam release,
-      \item the match confidence (0--1) combines title similarity weighted by word rarity (TF--IDF over all Roblox titles, so generic words such as ``Legends'' count little) and the Steam title appearing in the Roblox description,
-      \item only pairs above a confidence threshold are stored in \ep{bv\_*} and shown.
-    \end{itemize}
-    Matching precision is evaluated once by the team on a random sample of about 100 pairs.
-  \end{itemize}
-  \item \textbf{Serving layer:} PostgreSQL holds the real-time views \ep{rt\_*}, the batch views \ep{bv\_*}, \ep{model\_coeffs} and game metadata. The dashboard merges \ep{rt\_*} (recent hours) and \ep{bv\_*} (older data) in a single query.
+  \item \textbf{Ingestion:} one \ep{producers} service with Roblox and Steam job groups, a shared rate limiter (about 1 request/s per host), back-off on 429/5xx and field projection; invalid rows are dropped and counted. Two Kafka topics keyed by game ID with 72\,h retention and a \ep{kind} field: \ep{roblox.snapshots} (\ep{game}, \ep{votes}, \ep{sort}, \ep{meta}) and \ep{steam.players} (\ep{players}, \ep{meta}). Game snapshots carry Roblox \ep{updated}, so the update history lives in the master dataset. The tracked list \ep{tracked\_games} is rebuilt once per day: Roblox games seen in ranking lists in the last 7 days plus clone candidates (about 1,500 Roblox and $\le$300 Steam games); the top $\sim$500 Roblox games by players are polled every 5\,min, the rest every 15\,min.
+  \item \textbf{Speed layer} (\ep{speed-job}, Spark Structured Streaming in local mode, 5-min trigger): validates and deduplicates events, computes visit deltas and 1\,h/3\,h/24\,h growth, the Roblox trend score and the +3\,h projection (coefficients read from \ep{model\_coeffs} at the start of each micro-batch), and upserts 5-min rows into \ep{game\_metrics} and metadata into \ep{games}.
+  \item \textbf{Batch layer} (\ep{batch} service, APScheduler, sequential jobs). \emph{Hourly:} Kafka $\rightarrow$ append-only Parquet master dataset (\ep{availableNow} trigger, checkpoint on a volume; 72\,h retention covers a sink outage of up to three days), hourly aggregates computed from Parquet into \ep{game\_metrics\_hourly}, deletion of 5-min rows older than 14 days, retraining and evaluation of both models. \emph{Daily:} \ep{tracked\_games} refresh, clone matching and saturation.
+  \item \textbf{Serving layer:} PostgreSQL with the tables \ep{game\_metrics} (5-min, 14 days), \ep{game\_metrics\_hourly}, \ep{games}, \ep{tracked\_games}, \ep{bv\_matches}, \ep{model\_coeffs}, \ep{model\_health} and \ep{ingest\_stats}.
 \end{itemize}
 
-\textbf{ML.} Both models use linear regression (Spark MLlib).
+\textbf{Clone matching} (daily, fully automatic):
 \begin{itemize}
-  \item \textbf{Expected players model:} trained every hour on the last 7 days of hourly snapshots of all tracked games. It estimates how many players a game should have at a given time. The gap between actual and expected players is the \textbf{trend score}: games well above expectation are rising, and games well below are fading. It is evaluated with $R^2$ and RMSE.
-  \item \textbf{Trend model:} fitted per game on its recent player counts in the speed layer. It gives the growth rate and a +3\,h projection. It is evaluated by MAE against two baselines, ``same as now'' and ``same time yesterday'', and the result is shown in the \emph{Model and data health} view.
+  \item candidates are all Steam games from the store's \ep{popularnew} list released in the last 90 days (release date confirmed by \ep{appdetails}); their titles are searched in the Roblox search API (top 10--20 hits, about 40--80 queries/day),
+  \item \ep{description} and \ep{created} of the hits are fetched from the Roblox games API (they are empty or missing in search results),
+  \item titles are normalised (emoji, bracketed tags such as ``[UPD 3]'' and punctuation removed, lower case); a short stopword list (``simulator'', ``legends'', \ldots) reduces the weight of generic words,
+  \item hard rule: the Roblox game must be created after the Steam release,
+  \item match confidence (0--1) $= 0.5\cdot\text{title score} + 0.5\cdot\text{description score}$: fuzzy token-set ratio of the normalised titles and TF--IDF cosine similarity of the Steam \ep{short\_description} and the Roblox \ep{description}; if either description is empty, the title score alone is used,
+  \item pairs above one fixed threshold are stored in \ep{bv\_matches}; if the Roblox or Steam API fails, the previous matches are kept. Saturation is the number of matched games and their total players.
+\end{itemize}
+The team labels about 100 candidate pairs and reports precision and sample count on the whole labelled sample (no tuning split); rejected candidates are inspected for missed matches.
+
+\textbf{ML} (both models: Spark MLlib linear regression, retrained hourly by the batch layer on the last 7 days of hourly aggregates, coefficients and preprocessing saved in \ep{model\_coeffs}):
+\begin{itemize}
+  \item \textbf{Expected players model} (Roblox only), target $\log(1+\text{players})$. Features are context only: hour of day, day of week, \ep{genre\_l1} (one-hot), game age, trailing mean of $\log(1+\text{players})$ over the previous 7 days (earlier observations only) and like ratio (neutral 0.5 when votes are missing). The game's own recent growth is excluded, so the model is not circular. A game is scored only after 24\,h of history (cold start). Expected players $=\max(1,\exp(\widehat{y})-1)$; the trend score is actual players divided by this value (above/below 1 means above/below expected activity; growth supplies direction). Evaluation: a fit on the first six days is tested on the last completed day ($R^2$, RMSE in players, sample count), then the serving model is refitted on all seven days. Steam games get no trend score; they are ranked by 1\,h/3\,h/24\,h growth.
+  \item \textbf{+3\,h projection} (one model per platform): predicts $\log(1+\text{players})$ three hours ahead from current $\log(1+\text{players})$, its least-squares slope over the last 3\,h and the hour of day of the target time (one-hot). It is applied in the speed layer. Every hour, the batch layer computes its MAE (in players, on the last completed day) against two baselines on the same targets: \emph{same as now} (current players) and \emph{same time yesterday} (players 24\,h before the target time).
 \end{itemize}
 
 \subsection{Data schema}
 
-\textbf{Kafka topics.} Each record contains only the numeric fields needed for the speed layer; string metadata is published to \ep{meta} only on change. All topics use the game/app id as the message key.
+\textbf{Kafka topics} (JSON, key = game ID, 72\,h retention).
 
 {\small
-\begin{longtable}{L{3.4cm} L{4.0cm} L{6.2cm}}
+\begin{longtable}{L{3.0cm} L{2.6cm} L{8.4cm}}
 \toprule
-\textbf{Topic} & \textbf{Key fields} & \textbf{Example values}\\
+\textbf{Topic} & \textbf{Common fields} & \textbf{Fields by \ep{kind}}\\
 \midrule\endhead
-\ep{roblox.snapshots} & \ep{ts, id, playing, visits,}\newline\ep{favorites, up, down} & \ep{ts}=1729208700, \ep{id}=7436755782, \ep{playing}=21\,496\\
-\ep{roblox.sorts} & \ep{ts, country, rank, id,}\newline\ep{playerCount, isSponsored} & \ep{country}=``pl'', \ep{rank}=1\\
-\ep{steam.players} & \ep{ts, appid, player\_count} & \ep{appid}=730, \ep{player\_count}=812\,345\\
-\ep{meta} & \ep{ts, type, id, name,}\newline\ep{genre\_l1, created} & \ep{type}=``roblox'', \ep{name}=``Grow a Garden''\\
+\ep{roblox.snapshots} & \ep{kind, ts, id} & \ep{game}: \ep{playing, visits, favorites, updated}; \ep{votes}: \ep{up, down}; \ep{sort}: \ep{country, rank, playing}; \ep{meta}: \ep{name, genre\_l1, genre\_l2, created, description}\\
+\ep{steam.players} & \ep{kind, ts, id} & \ep{players}: \ep{players}; \ep{meta}: \ep{name, genres, released, short\_description}\\
 \bottomrule
 \end{longtable}}
 
 \textbf{PostgreSQL serving tables.}
 
 {\small
-\begin{longtable}{L{3.4cm} L{5.5cm} L{4.7cm}}
+\begin{longtable}{L{3.4cm} L{6.6cm} L{4.0cm}}
 \toprule
-\textbf{Table} & \textbf{Columns} & \textbf{Written by}\\
+\textbf{Table} & \textbf{Main columns} & \textbf{Written by}\\
 \midrule\endhead
-\ep{rt\_game\_stats} & \ep{id, ts, playing, visits\_delta,}\newline\ep{growth\_1h, growth\_3h,}\newline\ep{trend\_score, projection\_3h} & speed layer (upsert, 5\,min)\\
-\ep{rt\_ranked} & \ep{id, rank, platform, genre,}\newline\ep{country, ts} & speed layer (upsert, 5\,min)\\
-\ep{bv\_history} & \ep{id, hour\_ts, avg\_playing,}\newline\ep{visits\_delta\_1h} & batch layer (hourly)\\
-\ep{bv\_clones} & \ep{steam\_appid, roblox\_id,}\newline\ep{confidence, matched\_at} & batch layer (daily)\\
-\ep{bv\_saturation} & \ep{genre\_l1, game\_count,}\newline\ep{total\_players, ts\_day} & batch layer (daily)\\
-\ep{game\_meta} & \ep{id, platform, name, genre\_l1,}\newline\ep{genre\_l2, created, updated\_at} & producers (on change)\\
-\ep{model\_coeffs} & \ep{trained\_at, intercept,}\newline\ep{coef\_json} & batch layer (hourly retrain)\\
+\ep{game\_metrics} & \ep{platform, id, ts, players, new\_visits, up, down,}\newline\ep{growth\_1h, growth\_3h, growth\_24h, trend\_score,}\newline\ep{projection\_3h} & speed layer (upsert, 5\,min; kept 14 days)\\
+\ep{game\_metrics\_hourly} & \ep{platform, id, hour\_ts, players, peak\_players,}\newline\ep{new\_visits, updated} & batch layer (hourly)\\
+\ep{games} & \ep{platform, id, name, genre, description,}\newline\ep{created / released} & speed layer (from \ep{kind=meta})\\
+\ep{tracked\_games} & \ep{platform, id, is\_clone\_candidate, poll\_minutes} & batch layer (daily)\\
+\ep{bv\_matches} & \ep{steam\_id, roblox\_id, confidence, title\_score,}\newline\ep{desc\_score, matched\_at} & batch layer (daily)\\
+\ep{model\_coeffs} & \ep{model, platform, trained\_at, coeffs, preprocessing,}\newline\ep{r2, rmse} & batch layer (hourly)\\
+\ep{model\_health} & \ep{platform, evaluated\_at, mae\_model, mae\_now,}\newline\ep{mae\_yesterday, n} & batch layer (hourly)\\
+\ep{ingest\_stats} & \ep{ts, feed, ok, dropped, errors} & producers\\
 \bottomrule
 \end{longtable}}
 
 %======================================================================
 \section{Dashboard}
-Streamlit + Plotly. It shows only what the sources provide. Growth, sparklines, projections and scores appear once enough history has been collected (hours to days).
+Streamlit + Plotly. It shows only what the sources provide. \emph{Trending now} ranks Roblox games by trend score and Steam games by growth. \emph{Model and data health} is a plain page with three parts: projection MAE against the two baselines per platform, data freshness per feed and API errors. Growth, sparklines, projections and scores appear once enough history has been collected (at least 24\,h for scores and projections).
+
+\textbf{Matched-game navigation.} Selecting a Steam opportunity opens its details and a table of matched Roblox games: clickable name, latest players, 3\,h growth, creation date and match confidence. Selecting a Roblox name opens that game's metrics and player history. Its details show each possible Steam counterpart and, under each one, \emph{Other Roblox games matched to this Steam game}, excluding the current game. These tables reuse the existing matches, metadata and metrics; no separate similarity model or API is needed. Games with no Steam match show their own metrics and an empty-state message. The UI labels these relationships as \emph{matched games} or \emph{possible counterparts}, since the heuristic does not verify copying. Read and navigation rules are defined in \ep{docs/contracts.md}.
 \begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{%
@@ -359,9 +288,8 @@ Streamlit + Plotly. It shows only what the sources provide. Growth, sparklines, 
 % ---- view 1
 \draw[frame] (0,0) rectangle (11,9.2);
 \node[hd, anchor=west] at (0.3,8.75) {Trending now};
-\node[ph, minimum width=1.9cm, minimum height=0.5cm] at (6.2,8.75) {Roblox | Steam};
-\node[ph, minimum width=1.6cm, minimum height=0.5cm] at (8.25,8.75) {Genre};
-\node[ph, minimum width=1.4cm, minimum height=0.5cm] at (9.95,8.75) {Country};
+\node[ph, minimum width=1.9cm, minimum height=0.5cm] at (7.4,8.75) {Roblox | Steam};
+\node[ph, minimum width=1.6cm, minimum height=0.5cm] at (9.6,8.75) {Genre};
 \foreach \xx/\tx in {0.4/Game, 3.6/Players now, 5.3/24 h trend, 7.0/$\Delta$ 24 h, 8.2/Trend score, 10.0/+3 h} {\node[anchor=west, text=kfcgray] at (\xx,8.0) {\tx};}
 \draw[kfcgray!50] (0.3,7.75) -- (10.7,7.75);
 \foreach \yy/\nm/\pc/\dl/\sc/\pr in {7.35/Chop A Forest/58{,}053/+62\%/$\times$3.1/61k, 6.75/Drive A Kukirin!/17{,}766/+28\%/$\times$1.9/18k, 6.15/Brookhaven RP/446{,}366/+4\%/$\times$1.0/450k, 5.55/Grow a Garden/21{,}496/$-$9\%/$\times$0.2/21k} {
@@ -372,44 +300,37 @@ Streamlit + Plotly. It shows only what the sources provide. Growth, sparklines, 
 \foreach \xx/\tx in {0.4/Steam game (release), 3.9/Steam players, 6.1/Roblox matches, 8.1/Players, 9.5/Saturation} {\node[anchor=west, text=kfcgray] at (\xx,4.15) {\tx};}
 \draw[kfcgray!50] (0.3,3.9) -- (10.7,3.9);
 \node[anchor=west] at (0.4,3.5) {Dressmaker (21 Sep 2026)}; \node[anchor=west] at (3.9,3.5) {(live)}; \node[anchor=west] at (6.1,3.5) {3 games}; \node[anchor=west] at (8.1,3.5) {1,278}; \node[ph, fill=lightteal, anchor=west] at (9.5,3.5) {low};
-\node[anchor=west] at (0.4,2.9) {R.E.P.O. (26 Feb 2025)}; \node[anchor=west] at (3.9,2.9) {(live)}; \node[anchor=west] at (6.1,2.9) {n matches}; \node[anchor=west] at (8.1,2.9) {sum}; \node[ph, fill=lightamber, anchor=west] at (9.5,2.9) {high};
-\node[ph, minimum width=10.3cm, minimum height=1.3cm, anchor=south west] at (0.35,0.4) {Genre saturation: games vs.\ total players per Roblox genre (bar chart)};
+\node[anchor=west] at (0.4,2.9) {Example (Oct 2026)}; \node[anchor=west] at (3.9,2.9) {(live)}; \node[anchor=west] at (6.1,2.9) {n matches}; \node[anchor=west] at (8.1,2.9) {sum}; \node[ph, fill=lightamber, anchor=west] at (9.5,2.9) {high};
 % ---- view 2
 \draw[frame] (11.6,0) rectangle (22.6,9.2);
 \node[hd, anchor=west] at (11.9,8.75) {Game details: Be A Dressmaker};
 \foreach \ii/\lb/\vl in {0/Players now/612, 1/Lifetime visits/value, 2/Like ratio/value, 3/Created/28 Sep 2026, 4/Last update/value} {
   \node[ph, minimum width=1.95cm, minimum height=0.95cm, anchor=north west, text width=1.8cm] at (11.9+\ii*2.1,8.35) {\lb\\\textbf{\vl}};}
-\node[ph, minimum width=10.4cm, minimum height=3.2cm, anchor=north west, text width=10cm] at (11.9,7.1) {Players time series (5-min, last 7 days; hourly before) with update markers,\\dashed +3 h projection and the Steam original on a secondary axis};
-\node[hd, anchor=west] at (11.9,3.45) {Trend timeline};
-\draw[thick, kfcgray] (12.3,2.85) -- (22.0,2.85);
-\fill[kfcpurple] (12.5,2.85) circle (0.12); \node[anchor=north west] at (12.3,2.7) {Steam release 21 Sep};
-\fill[kfcteal] (17.4,2.85) circle (0.12); \fill[kfcteal] (17.7,2.85) circle (0.12); \fill[kfcteal] (18.0,2.85) circle (0.12);
-\node[anchor=north] at (17.7,2.7) {Roblox clones 26--28 Sep};
-\fill[red!60!black] (21.8,2.85) circle (0.12); \node[anchor=north] at (21.6,2.7) {today};
-\node[ph, minimum width=6.4cm, minimum height=1.25cm, anchor=south west, text width=6.2cm] at (11.9,0.4) {Similar games (same genre\_l2) and matched clones};
+\node[ph, minimum width=10.4cm, minimum height=3.2cm, anchor=north west, text width=10cm] at (11.9,7.1) {Players time series (5-min rows for the last 14 days, hourly aggregates for longer ranges)\\with update markers, the +3 h projection,\\and a selected possible Steam counterpart on a secondary axis};
+\node[hd, anchor=west] at (11.9,3.45) {Dates};
+\node[ph, minimum width=10.4cm, minimum height=1.3cm, anchor=north west, text width=10cm] at (11.9,3.2) {Possible Steam counterpart (click to open): released 21 Sep\\Matched Roblox games created: 26 Sep, 27 Sep, 28 Sep};
+\node[ph, minimum width=6.4cm, minimum height=1.25cm, anchor=south west, text width=6.2cm] at (11.9,0.4) {Other Roblox games matched to this Steam game\\Clickable name, players, 3 h growth, created, confidence};
 \node[ph, fill=lightblue, minimum width=3.7cm, minimum height=1.25cm, anchor=south west, text width=3.5cm] at (18.6,0.4) {Match confidence\\\textbf{0.87} (threshold 0.7)};
 \end{tikzpicture}
 }
-\caption{Wireframe of \emph{Trending now} and \emph{Game details}. Player counts and dates are real measurements from 17 Oct 2026. Growth, score, projection, saturation and match-confidence values are illustrative.}
+\caption{Wireframe of \emph{Trending now} (Roblox tab, with the opportunities table) and \emph{Game details}. The Steam tab shows 1\,h/3\,h/24\,h growth instead of the trend score. Named-game player counts and dates are measurements from 17 Oct 2026; the second opportunity row is illustrative. Growth, score, projection, saturation and match-confidence values are illustrative.}
 \label{fig:wire}
 \end{figure}
 
 %======================================================================
 \section{Infrastructure and technologies}
-Everything runs locally with Docker Compose and needs about 8\,GB of RAM. There are two ready-made images (Kafka, PostgreSQL) and one own image, \ep{app}, which contains Python 3.12, Java 17 and Spark 3.5 with the Kafka connector and the PostgreSQL JDBC driver built in. The \ep{app} image is started as six services that differ only in their \ep{command}. This gives separate logs and restarts while there is still a single Dockerfile.
+Everything runs locally with Docker Compose. There are two ready-made images (Kafka, PostgreSQL) and one own image, \ep{app}, which contains Python 3.12, Java 17 and Spark 3.5 with the Kafka connector and PostgreSQL JDBC driver. The \ep{app} image is started as four services that differ only in their \ep{command}. This gives separate logs and restarts while there is still a single Dockerfile. The memory budget (about 6\,GB RAM) is an estimate that has not been verified yet; peak memory of the full stack will be measured.
 \begin{table}[H]
 \centering\small
 \begin{tabularx}{\textwidth}{L{3.0cm} L{3.4cm} Y}
 \toprule
 \textbf{Service} & \textbf{Image} & \textbf{Role}\\
 \midrule
-\ep{kafka} & \ep{apache/kafka:3.7.0} (KRaft) & message broker, 24\,h retention (1\,GB RAM)\\
-\ep{postgres} & \ep{postgres:16} & serving layer: \ep{rt\_*}, \ep{bv\_*}, \ep{model\_coeffs}, metadata (512\,MB)\\
-\ep{producer-roblox} & \ep{app} & ranking lists, games, votes every 5/15 min; search daily\\
-\ep{producer-steam} & \ep{app} & current players every 15 min; charts, store search, details daily\\
-\ep{speed-job} & \ep{app} & speed layer (Structured Streaming, \ep{spark.driver.memory} 2\,GB)\\
-\ep{batch-sink} & \ep{app} & hourly Kafka $\rightarrow$ Parquet master dataset on volume \ep{/data/master}\\
-\ep{batch-jobs} & \ep{app} & scheduled Spark batch jobs: aggregates, model training, matching (2\,GB)\\
+\ep{kafka} & \ep{apache/kafka:3.7.0} (KRaft) & message broker, 2 topics, 72\,h retention\\
+\ep{postgres} & \ep{postgres:16} & serving layer: \ep{game\_metrics}, \ep{game\_metrics\_hourly}, \ep{bv\_matches}, \ep{model\_coeffs}, \ep{model\_health}, metadata\\
+\ep{producers} & \ep{app} & Roblox: ranking lists, games and votes every 5/15 min, search daily; Steam: current players every 15 min, charts, store search and details daily\\
+\ep{speed-job} & \ep{app} & Structured Streaming: metrics, growth, Roblox trend score, +3\,h projection\\
+\ep{batch} & \ep{app} & scheduled sequential jobs: hourly Kafka $\rightarrow$ Parquet sink on volume \ep{/data/master}, hourly aggregates, retention cleanup, model training and evaluation; daily tracked list refresh and matching\\
 \ep{dashboard} & \ep{app} & Streamlit on port 8501\\
 \bottomrule
 \end{tabularx}
@@ -424,7 +345,7 @@ Everything runs locally with Docker Compose and needs about 8\,GB of RAM. There 
 Ingestion & Python producers (\ep{requests}, \ep{confluent-kafka}, APScheduler) & Apache NiFi, Kafka Connect\\
 Messaging & Apache Kafka 3.7 (KRaft, single broker) & Redpanda, RabbitMQ\\
 Batch storage & Parquet + Snappy on a Docker volume & HDFS, MinIO (S3); switching only changes the storage path\\
-Batch processing / ML & Apache Spark 3.5 (PySpark, local mode), Spark MLlib & Hive, Pandas\\
+Batch processing / ML & Apache Spark 3.5 (PySpark, local mode), Spark MLlib linear regression (both models); \ep{rapidfuzz} (titles) and \ep{scikit-learn} TF--IDF (descriptions) for clone matching & Hive, Pandas\\
 Stream processing & Spark Structured Streaming & Apache Flink, Kafka Streams\\
 Scheduling & APScheduler inside the \ep{app} services & Apache Airflow, cron\\
 Serving & PostgreSQL 16 & TimescaleDB, Cassandra\\
@@ -432,6 +353,8 @@ Presentation & Streamlit + Plotly & Grafana, Apache Superset\\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+\textbf{Limitations.} The RAM estimate is not verified. Measured API timings are observations, not guaranteed quotas. Undocumented discovery endpoints may change; saved responses are kept as parser fixtures. Matching covers only discovered games and the first 10--20 Roblox search hits, and the creation-date rule misses games repurposed from older universes. Kafka keeps 72\,h of data, so only a sink outage longer than three days loses data.
 
 %======================================================================
 \section{Risks and mitigations}
@@ -443,9 +366,9 @@ Presentation & Streamlit + Plotly & Grafana, Apache Superset\\
 \midrule
 Undocumented Roblox endpoints (\ep{explore-api}, \ep{search-api}) change or break & Medium & Fallback to documented legacy \ep{games.roblox.com} for player counts; alert on HTTP\,4xx; UUID \ep{sessionId} is stateless and trivially regenerated.\\
 HTTP\,429 from Roblox (observed after ${\sim}$11 rapid requests) & High -- known & Per-endpoint back-off with jitter; batching up to 50 IDs per call; 1\,s sleep between batch groups.\\
-Steam / SteamSpy throttling & Low & 0.5\,s sleep between per-game calls; store and \ep{appdetails} polled at daily cadence only.\\
+Steam throttling & Low & 0.5\,s sleep between per-game calls; store and \ep{appdetails} polled at daily cadence only.\\
 Spark local-mode OOM on large micro-batches & Medium & \ep{spark.driver.memory 2g}; 5-min trigger limits in-flight data; \ep{maxOffsetsPerTrigger} for backpressure.\\
-Clone matching false positives above threshold & Medium & Manual spot-check on ${\sim}$100 randomly sampled pairs before final demo; confidence threshold tunable in \ep{model\_coeffs}.\\
+Clone matching false positives above threshold & Medium & Precision measured on ${\sim}$100 manually labelled pairs before the final demo; one fixed threshold set in configuration.\\
 \bottomrule
 \end{tabularx}}
 
@@ -453,7 +376,7 @@ Clone matching false positives above threshold & Medium & Manual spot-check on $
 \section{Planned use of GenAI tools}
 We will use \textbf{Claude Code} (Anthropic). The repository will contain:
 \begin{itemize}
-  \item a shared \ep{CLAUDE.md} with the architecture, Kafka topics, table schemas and coding conventions,
+  \item a shared \ep{CLAUDE.md} with the architecture and coding conventions, and \ep{docs/contracts.md} with Kafka payloads, table schemas and processing rules (written before any code),
   \item a \emph{grill me} skill that critically questions each design or plan before implementation starts,
   \item dedicated implementation skills for recurring parts of the system, e.g.\ an API producer, a Spark Structured Streaming job, a Spark batch job, a new \ep{app} service in Docker Compose, and a Streamlit dashboard view.
 \end{itemize}
@@ -461,21 +384,18 @@ We will use \textbf{Claude Code} (Anthropic). The repository will contain:
 %======================================================================
 \noindent\begin{minipage}{\textwidth}
 \section{Team and task allocation}
-Each area has one owner (\textbf{O}) and two supporters (S).\par\vspace{6pt}
+Each area has one owner (\textbf{O}) and up to three supporters (S). The owner of Compose and integration keeps \ep{docker compose up} working on the main branch.\par\vspace{6pt}
 {\centering\small
 \newcommand{\own}{\cellcolor{lightblue}\textbf{O}}
 \begin{tabularx}{\textwidth}{Y >{\centering\arraybackslash}p{2.1cm} >{\centering\arraybackslash}p{2.1cm} >{\centering\arraybackslash}p{2.1cm} >{\centering\arraybackslash}p{2.1cm}}
 \toprule
 \textbf{Area} & \textbf{Bart\l{}omiej Borycki} & \textbf{Micha\l{} Iwaniuk} & \textbf{Jan Cwalina} & \textbf{Mi\l{}osz Choda\'n}\\
 \midrule
-Ingestion (Python producers) & & \own & S & S\\
-Messaging (Kafka) & S & \own & & S\\
-Batch storage (Parquet master dataset) & \own & S & S & \\
-Batch processing / ML (Spark, MLlib) & S & & \own & S\\
-Stream processing (Structured Streaming) & & S & S & \own\\
-Scheduling and app image (APScheduler, Dockerfile, Compose) & S & S & \own & \\
-Serving (PostgreSQL) & \own & & S & S\\
-Presentation (Streamlit + Plotly) & S & S & & \own\\
+Ingestion and Kafka (producers, topics) & S & \own & S & S\\
+Batch layer and ML (Parquet, Spark, MLlib, matching) & S & & \own & S\\
+Speed layer (Structured Streaming) & & S & S & \own\\
+Serving and dashboard (PostgreSQL, Streamlit, contracts) & \own & S & & S\\
+Compose, app image, scheduling, integration & S & \own & S & \\
 \bottomrule
 \end{tabularx}\par}
 \end{minipage}

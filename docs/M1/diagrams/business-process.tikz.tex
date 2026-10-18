@@ -1,0 +1,49 @@
+% Shared by the report and the standalone business-process PDF.
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  task/.style={rectangle, rounded corners=4pt, draw=kfcgray, fill=white, thick, minimum height=1.25cm, align=center, text width=2.8cm},
+  start/.style={circle, draw=kfcteal, thick, minimum size=0.65cm, fill=white},
+  endev/.style={circle, draw=kfcteal, line width=2pt, minimum size=0.65cm, fill=white},
+  gw/.style={diamond, draw=kfcpurple, thick, fill=white, minimum size=0.9cm, inner sep=0pt, font=\sffamily\bfseries},
+  flow/.style={-{Stealth[length=2.6mm]}, thick, draw=kfcgray},
+  lbl/.style={font=\sffamily\scriptsize, fill=white, inner sep=2pt}
+]
+% A single participant's process: every activity has sequence-flow connections.
+\draw[thick, kfcgray] (0,0) rectangle (25,-12);
+\draw[thick, kfcgray] (0.8,0) -- (0.8,-12);
+\node[rotate=90, font=\sffamily\bfseries] at (0.4,-6) {Developer / analyst};
+
+\node[start] (start) at (2,-2) {};
+\node[above=0.35cm of start, align=center] {Need a game\\opportunity};
+\node[task] (browse) at (5,-2) {Browse Steam-to-Roblox opportunities};
+\node[task] (filter) at (9,-2) {Filter Steam games by genre};
+\node[gw] (promising) at (12,-2) {X};
+\node[above=0.4cm of promising] {Promising Steam game?};
+\node[task] (details) at (16,-2) {Open Steam game details};
+\node[task] (metrics) at (21,-2) {Review Steam growth and saturation};
+
+\node[gw] (linked) at (21,-6) {X};
+\node[above left=0.3cm and 0.1cm of linked, align=right] {Any matched\\Roblox games?};
+\node[task] (compare) at (16,-6) {Compare matched Roblox games and confidence};
+\node[task] (select) at (11,-6) {Select a matched Roblox game and open its details};
+\node[task] (history) at (6,-6) {Review Roblox history, growth and projection};
+\node[gw] (merge) at (11,-10) {X};
+\node[task] (assess) at (16,-10) {Assess opportunity using available evidence};
+\node[endev] (end) at (21,-10) {};
+\node[below=0.35cm of end, align=center] {Opportunity\\assessed};
+
+\draw[flow] (start) -- (browse);
+\draw[flow] (browse) -- (filter);
+\draw[flow] (filter) -- (promising);
+\draw[flow] (promising) -- node[lbl, above]{yes} (details);
+\draw[flow] (promising.south) -- (12,-3.7) -| node[lbl, pos=0.5, below]{no: refine filters} (filter.south);
+\draw[flow] (details) -- (metrics);
+\draw[flow] (metrics) -- (linked);
+\draw[flow] (linked) -- node[lbl, above]{yes} (compare);
+\draw[flow] (compare) -- (select);
+\draw[flow] (select) -- (history);
+\draw[flow] (history.south) |- (merge.west);
+\draw[flow] (linked.east) -- node[lbl, above]{no} (24,-6) -- (24,-8) -| node[lbl, pos=0.5, above]{Use Steam metrics; no detected matches} (merge.north);
+\draw[flow] (merge) -- (assess);
+\draw[flow] (assess) -- (end);
+\end{tikzpicture}
