@@ -1,0 +1,81 @@
+# Architecture index
+
+Single source of truth for the design of GameTrend Radar. Start here, then open only the documents your task needs (see "How to read" in [AGENTS.md](../AGENTS.md)).
+
+## Data flow
+
+```
+ Roblox / Steam APIs
+        │
+        ▼
+ [ingestion] producers ──► Kafka topics ───────────────► [speed] Spark Structured Streaming
+        ▲                  (roblox.snapshots,                 │  reads model_coeffs
+        │                   steam.players)                    ▼
+        │                        │                      MongoDB: game_metrics, games
+        │                        ▼                            │
+        │                  [batch] Kafka -> Parquet sink      │
+        │                        │                            │
+        │                        ▼                            │
+        │                  Parquet master dataset             │
+        │                        │                            │
+        │                        ▼                            │
+        │                  [batch] hourly aggregates,         │
+        │                  retention, tracked set ──► MongoDB: game_metrics_hourly, tracked_games
+        │                                                     │
+        │                  [matching] daily clone matching ─► MongoDB: bv_matches
+        │                  [ml] hourly training ────────────► MongoDB: model_coeffs, model_health
+        │                                                     │
+        └──────── tracked_games ◄─────────────────────────────┤
+                                                              ▼
+                                                   [dashboard] Streamlit
+
+ [common] shared metric logic used by speed, batch and dashboard
+ [infra]  docker compose, Kafka, MongoDB replica set, volumes
+ [demo]   accelerated data for the live presentation
+```
+
+## Table of contents
+
+| path | describes | status |
+|---|---|---|
+| [RUNNING.md](RUNNING.md) | how to set up, run and test the current state | living |
+| [_template.md](_template.md) | template for area documents | - |
+| **Contracts** | | |
+| [contracts/conventions.md](contracts/conventions.md) | types, timestamps, IDs, missing values, keys | agreed |
+| [contracts/kafka-topics.md](contracts/kafka-topics.md) | Kafka topics and event payloads | agreed |
+| [contracts/parquet-master.md](contracts/parquet-master.md) | Parquet master dataset | agreed (partly open) |
+| [contracts/mongodb-collections.md](contracts/mongodb-collections.md) | MongoDB collections, keys, field semantics | agreed |
+| **Areas** | | |
+| [ingestion/README.md](ingestion/README.md) | Roblox and Steam producers | planned |
+| [speed/README.md](speed/README.md) | streaming metrics into MongoDB | planned |
+| [batch/README.md](batch/README.md) | Parquet sink, hourly aggregates, retention, tracked set | planned |
+| [matching/README.md](matching/README.md) | daily Steam -> Roblox clone matching | planned |
+| [ml/README.md](ml/README.md) | expected-players and +3 h projection models | planned |
+| [dashboard/README.md](dashboard/README.md) | Streamlit dashboard | planned |
+| [common/README.md](common/README.md) | shared metric logic and history reads | planned |
+| [infra/README.md](infra/README.md) | docker compose, Kafka, MongoDB, volumes | planned |
+| [demo/README.md](demo/README.md) | accelerated data for the presentation | planned |
+
+Area status here is a summary; the per-module status lives in each area document. Statuses are changed by people, not by agents (see [AGENTS.md](../AGENTS.md)).
+
+## Owners
+
+Replace the placeholders, keep `git config user.name` exact (agents use it to find their area), and update [.github/CODEOWNERS](../.github/CODEOWNERS) with the same GitHub handles.
+
+| package | areas | owner | `git config user.name` | GitHub |
+|---|---|---|---|---|
+| A | `ingestion`, `infra`, `demo` | TODO | TODO | `@TODO-A` |
+| B | `speed`, `common` | TODO | TODO | `@TODO-B` |
+| C | `batch`, `matching` | TODO | TODO | `@TODO-C` |
+| D | `ml`, `dashboard` | TODO | TODO | `@TODO-D` |
+
+## Contract producers and consumers
+
+Who must review a change to each contract.
+
+| contract | producers | consumers |
+|---|---|---|
+| `kafka-topics.md` | ingestion (A), demo (A) | speed (B), batch (C) |
+| `parquet-master.md` | batch (C) | batch (C) |
+| `mongodb-collections.md` | speed (B), batch (C), matching (C), ml (D), ingestion (A, `ingest_stats`) | everyone |
+| `conventions.md` | everyone | everyone |

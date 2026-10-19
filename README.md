@@ -21,15 +21,22 @@ Roblox / Steam APIs
                                        └──►  Parquet master dataset  ──►  Spark batch jobs
                                                                                │
                                                                                ▼
-                                                                         PostgreSQL  ──►  Streamlit dashboard
+                                                                          MongoDB  ──►  Streamlit dashboard
 ```
 
 ## Repo structure
 
 ```
-docs/M1/        – Milestone 1 proposal (PDF + LaTeX source)
+architecture/   – design source of truth: index, data contracts, one doc per area, RUNNING.md
+src/gametrend/  – code, one package per area
+tests/          – unit tests, one folder per area
+infra/          – infrastructure configuration (Kafka, MongoDB, ...)
+docs/M1/        – Milestone 1 proposal (PDF + LaTeX source), frozen
 api_test/       – API investigation scripts and raw JSON responses
 ```
+
+Developers: start with [architecture/README.md](architecture/README.md); to run the project see
+[architecture/RUNNING.md](architecture/RUNNING.md). Coding agents follow [AGENTS.md](AGENTS.md).
 
 ## Team
 
