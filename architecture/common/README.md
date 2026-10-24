@@ -27,8 +27,8 @@ None (library code).
 ## Design / rules
 
 - Metric functions implement the [metric definitions](../contracts/mongodb-collections.md#metric-definitions) exactly; speed and batch call the same functions, so live and hourly numbers agree.
-- History reads go through one function, planned as `read_metrics(platform, id, from, to)`: 5-minute documents from `game_metrics` for the last 14 days (plus any kept older 5-minute documents of hours without an aggregate), and `game_metrics_hourly` for older hours.
-- The history read and the batch retention job use the SAME cutoff: start of the UTC hour of now - 14 days, where "now" is passed in (no wall clock in logic).
+- History reads go through one function, planned as `read_metrics(platform, id, from, to)`: 5-minute documents from `game_metrics` after the retention cutoff (plus any kept older 5-minute documents of hours without an aggregate), and `game_metrics_hourly` for older hours.
+- The history read and the batch retention job use the SAME cutoff: start of the UTC hour of now minus the [`game_metrics` retention](../contracts/mongodb-collections.md), where "now" is passed in (no wall clock in logic).
 - Function signatures are free for the owner to design; document them in the code map once implemented.
 
 ## Code map
@@ -39,9 +39,7 @@ None (library code).
 
 ## Tests
 
-```
-uv run pytest tests/common
-```
+Commands: [RUNNING.md](../RUNNING.md#running-tests).
 
 Metric functions are pure and must be fully covered, including the missing-value and counter-reset cases.
 

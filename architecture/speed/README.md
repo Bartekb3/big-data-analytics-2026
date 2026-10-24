@@ -35,11 +35,11 @@ Package B, see [owners](../README.md#owners).
 - `votes` events only enrich the same time bucket (`up`, `down`).
 - `sort` events are archived for the daily tracked-set rebuild and never write player counts.
 - `meta` events upsert `games`.
-- Steam `players` events write `players` only (no votes, visits or favorites).
+- Steam `players` events write `players`.
 
 ### Buckets and deduplication
 
-- `bucket = floor(ts / 5 min)`; one `game_metrics` document per `(platform, id, bucket)`.
+- One `game_metrics` document per `(platform, id)` and 5-minute bucket (see [`ts`](../contracts/mongodb-collections.md#game_metrics)).
 - Within a bucket, the latest event of each kind wins by its original observation timestamp. Older observations are rejected even if they arrive later.
 - `observed_at` guards player data, `votes_observed_at` guards vote data, `games.observed_at` guards metadata. The same rule applies to Steam.
 - A write sets only the fields of its event kind. A `votes` event that arrives before the `game` event of its bucket creates the document without `players`; the later `game` event fills it.
@@ -61,12 +61,12 @@ If a newer observation already exists, the filter does not match, the upsert tri
 ### Scoring
 
 - Growth and `new_visits` follow the [metric definitions](../contracts/mongodb-collections.md#metric-definitions), using the shared code from [common](../common/README.md).
-- Trend score (Roblox) uses the latest `expected_players` coefficients; a game is scored only after 24 h of history.
-- `projection_3h = max(0, expm1(prediction))` from the latest `projection_3h` coefficients, for games with at least 24 h of history; otherwise absent. Features are described in [ml](../ml/README.md#3-h-projection-one-model-per-platform).
+- Trend score (Roblox) uses the latest `expected_players` coefficients and the [cold start rule](../ml/README.md#expected-players-model-roblox-only) of that model.
+- `projection_3h` uses the latest `projection_3h` coefficients and is applied as described in [ml](../ml/README.md#3-h-projection-one-model-per-platform).
 
 ### Recovery
 
-- The speed consumer has its own persistent checkpoint, distinct from the Parquet sink. A speed-only outage resumes from the checkpoint within Kafka's 72 h retention.
+- A speed-only outage resumes from the speed checkpoint ([infra](../infra/README.md#design--rules)) as long as it is shorter than the [Kafka retention](../contracts/kafka-topics.md#general).
 - Timestamp-conditional upserts make replays safe; a unique index alone would let an old replay overwrite newer values.
 
 ## Code map
@@ -77,10 +77,7 @@ If a newer observation already exists, the filter does not match, the upsert tri
 
 ## Tests
 
-```
-uv run pytest tests/speed
-uv run pytest tests/speed -m "not spark"
-```
+Commands: [RUNNING.md](../RUNNING.md#running-tests). Coverage: TBD.
 
 ## Open questions
 

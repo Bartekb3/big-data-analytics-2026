@@ -38,9 +38,7 @@ To be designed and written here by the owner before implementation. Known constr
 
 ## Tests
 
-```
-uv run pytest tests/demo
-```
+Commands: [RUNNING.md](../RUNNING.md#running-tests). Coverage: TBD.
 
 ## Open questions
 

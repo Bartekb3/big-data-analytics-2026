@@ -15,7 +15,7 @@ Common fields of every event:
 | field | type | meaning |
 |---|---|---|
 | `kind` | string | event kind, see the tables below |
-| `ts` | ISO-8601 UTC string | producer observation time (unchanged on retry) |
+| `ts` | ISO-8601 UTC string | producer observation time, see [conventions](conventions.md#time) |
 | `id` | integer | Roblox `universeId` / Steam `appid` |
 
 ## `roblox.snapshots`

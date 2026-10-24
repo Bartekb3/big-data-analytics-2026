@@ -40,11 +40,9 @@ Internal behaviour: algorithms, ordering, error handling, configuration. Impleme
 
 ## Tests
 
-How to run this area's tests, what they cover, which fixtures they use.
+What the tests cover and which fixtures they use. Commands are in RUNNING.md; link there instead of copying them:
 
-```
-uv run pytest tests/<area>
-```
+Commands: [RUNNING.md](../RUNNING.md#running-tests).
 
 ## Open questions
 

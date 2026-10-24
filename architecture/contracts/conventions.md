@@ -1,5 +1,7 @@
 # Data conventions
 
+**Producers and consumers:** every area.
+
 Rules that apply to every contract (Kafka, Parquet, MongoDB). A contract file may tighten them, never relax them.
 
 ## Identifiers
@@ -30,5 +32,4 @@ Rules that apply to every contract (Kafka, Parquet, MongoDB). A contract file ma
 
 ## Changing a contract
 
-- Change the contract file in the same PR as the code that needs it, and describe the change in the PR description.
-- Producers and consumers of the changed contract review the PR (see the [index](../README.md#contract-producers-and-consumers); `.github/CODEOWNERS` requests them).
+See [AGENTS.md § Workflow](../../AGENTS.md#workflow).

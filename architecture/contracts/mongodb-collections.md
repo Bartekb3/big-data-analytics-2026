@@ -1,15 +1,17 @@
 # MongoDB collections
 
-Database `gametrend` on MongoDB 7, single-node replica set `rs0` (needed for multi-document transactions; see [infra](../infra/README.md)). General rules (types, keys, missing values, upserts) are in [conventions.md](conventions.md).
+**Producers and consumers:** per collection, see the writer and readers columns below.
+
+Database `gametrend` (deployment: see [infra](../infra/README.md#design--rules)). General rules (types, keys, missing values, upserts) are in [conventions.md](conventions.md).
 
 | collection | writer | readers | retention |
 |---|---|---|---|
-| [`game_metrics`](#game_metrics) | speed (insert/update), batch (retention delete) | dashboard, common history reads, ml (projection evaluation) | 14 days |
+| [`game_metrics`](#game_metrics) | speed (insert/update), batch (retention delete) | speed (history for growth and projection), batch (tracked-set ranking), dashboard, common history reads, ml (projection evaluation) | 14 days |
 | [`game_metrics_hourly`](#game_metrics_hourly) | batch | ml, dashboard, common history reads | whole project |
 | [`games`](#games) | speed (from `meta` events) | matching, ml, dashboard | whole project |
 | [`tracked_games`](#tracked_games) | batch (daily rebuild) | ingestion, matching | rebuilt daily |
 | [`bv_matches`](#bv_matches) | matching (daily rebuild) | batch (tracked set), dashboard | whole project |
-| [`model_coeffs`](#model_coeffs) | ml (hourly) | speed | whole project |
+| [`model_coeffs`](#model_coeffs) | ml (hourly) | speed, dashboard (model quality) | whole project |
 | [`model_health`](#model_health) | ml (hourly) | dashboard | whole project |
 | [`ingest_stats`](#ingest_stats) | ingestion | dashboard (health page) | TBD |
 
@@ -43,7 +45,7 @@ db.game_metrics.createIndex({ platform: 1, ts: -1 })    // "Trending now": lates
 
 ## `game_metrics_hourly`
 
-Hourly aggregates computed from the Parquet master dataset; authoritative for history older than 14 days. One document per `(platform, id, hour_ts)`, only for closed hours.
+Hourly aggregates computed from the Parquet master dataset; authoritative for history older than the `game_metrics` retention. One document per `(platform, id, hour_ts)`, only for closed hours.
 
 | field | type | meaning |
 |---|---|---|
@@ -81,7 +83,7 @@ db.games.createIndex({ platform: 1, genre_l1: 1 })
 
 ## `tracked_games`
 
-The set of games the producers poll. Roblox ~1,500, Steam <= 300.
+The set of games the producers poll, built by the [tracked set rules](../batch/README.md#tracked-set-rules).
 
 | field | type | meaning |
 |---|---|---|
@@ -113,7 +115,7 @@ db.bv_matches.createIndex({ roblox_id: 1 })           // Roblox details -> its S
 
 ## `model_coeffs`
 
-Model coefficients and preprocessing, read by the speed layer (latest document per `model` and `platform`).
+Model coefficients and preprocessing. Speed reads the latest document per `model` and `platform`.
 
 | field | type | meaning |
 |---|---|---|

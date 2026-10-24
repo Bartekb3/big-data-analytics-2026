@@ -34,21 +34,19 @@ Package A, see [owners](../README.md#owners).
 - Shared rate limiter, about 1 request/s per host.
 - Exponential back-off with jitter on HTTP 429 and 5xx.
 - At most 50 IDs per Roblox batch call.
-- On retry, the producer keeps the original `ts` of the observation.
-- Producers keep only the contract fields; invalid records are dropped and counted in `ingest_stats`.
 
 ### API sources and cadence
 
 | event | API endpoint (API field -> event field) | cadence |
 |---|---|---|
-| Roblox `game` | `games.roblox.com/v1/games` (`playing`, `visits`, `favoritedCount` -> `favorites`, `updated`) | games with `poll_minutes = 5` (top ~500) every 5 min, the rest every 15 min |
+| Roblox `game` | `games.roblox.com/v1/games` (`playing`, `visits`, `favoritedCount` -> `favorites`, `updated`) | every `poll_minutes` of the game (from `tracked_games`) |
 | Roblox `votes` | `games.roblox.com/v1/games/votes` (`upVotes` -> `up`, `downVotes` -> `down`) | every 15 min, same 50-ID loop as `game` |
 | Roblox `sort` | `explore-api/v1/get-sorts` (`playerCount` -> `playing`), 3 countries | every 15 min |
 | Roblox `meta` | `games.roblox.com/v1/games` (`name`, `genre_l1`, `genre_l2`, `created`, `description`) | only when the metadata changes |
-| Steam `players` | `ISteamUserStats/GetNumberOfCurrentPlayers` (`player_count` -> `players`) | every 15 min, <= 300 games |
+| Steam `players` | `ISteamUserStats/GetNumberOfCurrentPlayers` (`player_count` -> `players`) | every `poll_minutes` of the game (from `tracked_games`) |
 | Steam `meta` | `store.steampowered.com/api/appdetails` (`name`, `genres[].description` -> `genres`, `release_date.date` -> `released`, `short_description`) | when a game is first seen or its metadata changes |
 
-Steam `release_date.date` comes as e.g. `"Feb 26, 2025"` and must be converted to `YYYY-MM-DD`. Recorded responses of every endpoint are in `api_test/responses/`.
+Steam `release_date.date` comes as e.g. `"Feb 26, 2025"` and must be converted to `YYYY-MM-DD`.
 
 ## Code map
 
@@ -58,11 +56,9 @@ Steam `release_date.date` comes as e.g. `"Feb 26, 2025"` and must be converted t
 
 ## Tests
 
-```
-uv run pytest tests/ingestion
-```
+Commands: [RUNNING.md](../RUNNING.md#running-tests).
 
-Use `api_test/responses/*.json` as fixtures for parsing and validation.
+Parsing and validation are tested against `api_test/responses/*.json`, which holds a recorded response of every endpoint.
 
 ## Open questions
 

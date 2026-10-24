@@ -1,6 +1,6 @@
 # Running GameTrend Radar (developer guide)
 
-How to set up, start and test the project **in its current state of implementation**. Update this file whenever a verified change affects setup, startup or tests (AGENTS.md rule 10). If something here does not work, fix the file or report it.
+How to set up, start and test the project **in its current state of implementation** (kept current by [AGENTS.md](../AGENTS.md) rule 10). If something here does not work, fix the file or report it.
 
 ## What works now
 
@@ -53,15 +53,13 @@ docker compose up -d <services>
 
 ## Running tests
 
-Unit tests need no network and no Docker. Tests for area `<area>` live in `tests/<area>/`.
+Rules for tests (no network, no Docker, fixtures, markers) are in [AGENTS.md § Testing](../AGENTS.md#testing).
 
 ```
 uv run pytest                          # all tests
 uv run pytest tests/<area>             # one area
 uv run pytest -m "not spark"           # skip tests that start a local SparkSession
 ```
-
-Fixtures: use the recorded API payloads in `api_test/responses/` instead of calling APIs.
 
 ## Troubleshooting
 

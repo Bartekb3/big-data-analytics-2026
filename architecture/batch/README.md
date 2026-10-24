@@ -39,9 +39,9 @@ Package C, see [owners](../README.md#owners).
 
 Run in this order; a job never overlaps with itself:
 
-1. **Kafka -> Parquet sink:** Structured Streaming with the `availableNow` trigger and a checkpoint on a volume; append-only, Snappy-compressed Parquet in `/data/master`.
-2. **Hourly aggregates** into `game_metrics_hourly`, computed from Parquet with the same shared functions as the speed layer ([common](../common/README.md)), never from speed output. Only closed hours covered by the archive. `players` = last value of the hour, `peak_players` = max, `new_visits` = sum of valid deltas, `updated` = last, `up`/`down` = last non-null vote observation. Missing observations never become zeroes.
-3. **Retention:** in ONE multi-document transaction (`session.with_transaction`), upsert the hourly documents and delete 5-minute documents older than the cutoff (start of the UTC hour of now - 14 days). 5-minute documents whose hour has no hourly aggregate are kept. The cutoff is the same one used by history reads in [common](../common/README.md).
+1. **Kafka -> Parquet sink:** Structured Streaming with the `availableNow` trigger and a checkpoint on a volume, writing the [Parquet master dataset](../contracts/parquet-master.md).
+2. **Hourly aggregates** into [`game_metrics_hourly`](../contracts/mongodb-collections.md#game_metrics_hourly), computed from Parquet with the shared functions from [common](../common/README.md), never from speed output. Only closed hours covered by the archive.
+3. **Retention:** in ONE multi-document transaction (`session.with_transaction`), upsert the hourly documents and delete 5-minute documents older than the [retention cutoff](../common/README.md#design--rules). 5-minute documents whose hour has no hourly aggregate are kept.
 4. **Training and evaluation** of both models ([ml](../ml/README.md)).
 
 ### Daily
@@ -54,12 +54,11 @@ Tracked set rebuild, clone matching ([matching](../matching/README.md)), saturat
 - Roblox: games with a `sort` event in the last 7 days (from the master dataset) plus Roblox games currently in `bv_matches`. Cap ~1,500: over the cap, matched games are kept first, then games by latest `players`.
 - Steam (<= 300): today's top-100 chart games plus clone candidates (all `popularnew` games released in the last 90 days, release date confirmed by `appdetails`), ranked by current players if over the cap.
 - `poll_minutes`: the top ~500 Roblox games by latest `players` get 5; all other Roblox games and all Steam games get 15.
-- `is_clone_candidate = true` for Steam clone candidates and for Roblox games in `bv_matches`.
+- `is_clone_candidate` as defined in [`tracked_games`](../contracts/mongodb-collections.md#tracked_games).
 
 ### Recovery and authority
 
-- Kafka keeps messages for 72 h, so a sink outage of up to three days loses no data. Longer outages lose the expired offsets: record the gap and mark history incomplete. This is a local, single-machine prototype, not a highly available deployment.
-- The sink and the speed layer have distinct persistent checkpoints.
+- A sink outage shorter than the [Kafka retention](../contracts/kafka-topics.md#general) loses no data. Longer outages lose the expired offsets: record the gap and mark history incomplete.
 - Hourly aggregates are authoritative and recomputed from Parquet. `games` and `game_metrics_hourly` can be rebuilt from Parquet after the loss of the MongoDB volume.
 
 ## Code map
@@ -70,10 +69,7 @@ Tracked set rebuild, clone matching ([matching](../matching/README.md)), saturat
 
 ## Tests
 
-```
-uv run pytest tests/batch
-uv run pytest tests/batch -m "not spark"
-```
+Commands: [RUNNING.md](../RUNNING.md#running-tests). Coverage: TBD.
 
 ## Open questions
 

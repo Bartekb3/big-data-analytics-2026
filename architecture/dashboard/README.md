@@ -34,7 +34,7 @@ None.
 ### Navigation
 
 - Game details are selected by `(platform, id)`. Clicking a game name opens that game's details: metadata, player history, growth and projection when available.
-- Missing history or metrics appear as unavailable, not zero, and do not prevent opening details.
+- Missing history or metrics ([shown as unavailable](../contracts/conventions.md#missing-values)) do not prevent opening details.
 
 ### Matched games
 
@@ -48,7 +48,7 @@ None.
 ### Metrics shown
 
 - Roblox games are ranked by trend score, Steam games by 1 h / 3 h / 24 h growth (see [metric definitions](../contracts/mongodb-collections.md#metric-definitions)).
-- Model evaluation is shown as unavailable before enough history exists.
+- Model evaluation (`r2`/`rmse`, `model_health`) is shown as unavailable before enough history exists.
 
 ## Code map
 
@@ -58,9 +58,7 @@ None.
 
 ## Tests
 
-```
-uv run pytest tests/dashboard
-```
+Commands: [RUNNING.md](../RUNNING.md#running-tests).
 
 Test the query/assembly logic (row building, ordering, missing values) separately from Streamlit rendering.
 

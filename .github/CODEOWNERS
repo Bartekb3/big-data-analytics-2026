@@ -1,5 +1,4 @@
-# Replace @TODO-A..D with GitHub handles (same as the owners table in architecture/README.md).
-# Package A: ingestion, infra, demo | B: speed, common | C: batch, matching | D: ml, dashboard
+# Replace @TODO-A..D with GitHub handles from the owners table in architecture/README.md.
 # Later rules override earlier ones for the same path.
 
 # Shared files: everyone reviews
@@ -38,7 +37,7 @@
 /src/gametrend/dashboard/                @TODO-D
 /tests/dashboard/                        @TODO-D
 
-# Contracts: producers and consumers review (see architecture/README.md)
+# Contracts: producers and consumers review (listed at the top of each contract file)
 /architecture/contracts/kafka-topics.md          @TODO-A @TODO-B @TODO-C
 /architecture/contracts/parquet-master.md        @TODO-C
 /architecture/contracts/mongodb-collections.md   @TODO-A @TODO-B @TODO-C @TODO-D

@@ -49,9 +49,7 @@ Package C, see [owners](../README.md#owners).
 
 ## Tests
 
-```
-uv run pytest tests/matching
-```
+Commands: [RUNNING.md](../RUNNING.md#running-tests).
 
 Use `api_test/responses/roblox_search_response.json`, `roblox_games_response.json` and `steam_appdetails_response.json` as fixtures.
 

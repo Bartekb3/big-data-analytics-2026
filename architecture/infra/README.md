@@ -27,7 +27,7 @@ None.
 
 Running services that implement the storage side of the contracts:
 
-- Kafka topics from [kafka-topics.md](../contracts/kafka-topics.md) with 72 h retention.
+- Kafka topics from [kafka-topics.md](../contracts/kafka-topics.md), with the retention defined there.
 - MongoDB database `gametrend` with the collections and indexes from [mongodb-collections.md](../contracts/mongodb-collections.md).
 - The `/data/master` volume for the [Parquet master dataset](../contracts/parquet-master.md).
 
@@ -37,11 +37,10 @@ Running services that implement the storage side of the contracts:
 - MongoDB 7 runs as a single-node replica set `rs0` (required for the multi-document retention transaction).
 - Indexes are created at startup exactly as listed in the MongoDB contract.
 - Speed and archive (Parquet sink) consumers get distinct persistent checkpoint volumes.
-- Infra files live in `infra/` and the repo root (`docker-compose.yml`, `.env.example`).
 
-### Retention and disk sizing
+### Disk sizing
 
-- `game_metrics`: 14 days. `game_metrics_hourly`, `games`, `bv_matches`, `model_coeffs`, `model_health`: whole project. Kafka: 72 h. Parquet master dataset: append-only, whole project.
+- Retention periods are defined in the contracts: [MongoDB](../contracts/mongodb-collections.md), [Kafka](../contracts/kafka-topics.md#general), [Parquet](../contracts/parquet-master.md#general).
 - The proposal estimates about 0.5M source events/day, 5-8 MB/day of Parquet. MongoDB documents and indexes, checkpoints and Kafka retention come on top; measure total disk usage during the full-stack run and record it here.
 
 ## Code map

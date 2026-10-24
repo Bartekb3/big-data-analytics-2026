@@ -37,13 +37,12 @@ Both models are retrained hourly (step 4 of the [batch hourly sequence](../batch
 - Features are context only: hour of day, day of week, `genre_l1` (one-hot, fitted on training rows; unseen levels encoded as all zeros), game age (days since `created`), trailing mean of `log(1 + players)` over the previous 7 days (earlier observations only), like ratio `up / (up + down)` (neutral 0.5 when votes are missing). The game's own recent growth is excluded, so the model is not circular. No future observations are used.
 - Cold start: a game is scored only after 24 h of history.
 - Evaluation: a fit on the first six days is tested on the last completed day (R2, RMSE in players, sample count), then the serving model is refitted on all seven days. Evaluation is unavailable before enough history exists.
-- Steam games get no trend score; they are ranked by 1 h / 3 h / 24 h growth.
 
 ### +3 h projection (one model per platform)
 
 - Target `log(1 + players)` three hours ahead.
 - Features: current `log(1 + players)`, its least-squares slope over the last 3 h (at least 3 observations), hour of day of the target time (one-hot).
-- Applied by the speed layer to every 5-minute document of a game with at least 24 h of history; `projection_3h = max(0, expm1(prediction))`. Otherwise `projection_3h` is absent.
+- Applied by the speed layer to every 5-minute document where [`projection_3h`](../contracts/mongodb-collections.md#game_metrics) is defined; `projection_3h = max(0, expm1(prediction))`.
 - Evaluation (hourly, written to `model_health`): on the last completed UTC day, for every 5-minute document with `projection_3h`, the target is the actual `players` of the bucket at `ts + 3h`. MAE in players against two baselines on exactly the same targets: **same as now** (`players` at `ts`) and **same time yesterday** (`players` at `ts + 3h - 24h`). Only targets where all three values exist are scored; `n` is the sample count.
 
 ## Code map
@@ -54,10 +53,7 @@ Both models are retrained hourly (step 4 of the [batch hourly sequence](../batch
 
 ## Tests
 
-```
-uv run pytest tests/ml
-uv run pytest tests/ml -m "not spark"
-```
+Commands: [RUNNING.md](../RUNNING.md#running-tests). Coverage: TBD.
 
 ## Open questions
 

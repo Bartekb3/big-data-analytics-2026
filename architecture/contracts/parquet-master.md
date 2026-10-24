@@ -8,7 +8,7 @@
 - Location: `/data/master` (Docker volume, see [infra](../infra/README.md)).
 - Format: Parquet, Snappy-compressed.
 - Append-only; kept for the whole project. Never rewritten or deleted.
-- Content: every event from both [Kafka topics](kafka-topics.md), all kinds (`game`, `votes`, `sort`, `meta`, `players`), with the fields and meaning defined there. Metadata (`meta`) and the update history (`updated` in `game`) are included, so `games` and `game_metrics_hourly` can be rebuilt from Parquet after the loss of the MongoDB volume.
+- Content: every event from both [Kafka topics](kafka-topics.md), all kinds (`game`, `votes`, `sort`, `meta`, `players`), with the fields and meaning defined there. Metadata (`meta`) and the update history (`updated` in `game`) are included, so `games` and `game_metrics_hourly` can be rebuilt from Parquet (see [batch recovery](../batch/README.md#recovery-and-authority)).
 
 ## Open
 
