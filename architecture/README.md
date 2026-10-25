@@ -63,7 +63,7 @@ Area status here is a summary; the per-module status lives in each area document
 
 ## Owners
 
-Replace the placeholders, keep `git config user.name` exact (agents use it to find their area), and update [.github/CODEOWNERS](../.github/CODEOWNERS) with the same GitHub handles. CODEOWNERS is the one allowed copy of this table, because GitHub needs it there.
+Replace the placeholders and keep `git config user.name` exact (agents use it to find their area). GitHub handles are for requesting PR reviews.
 
 | package | areas | owner | `git config user.name` | GitHub |
 |---|---|---|---|---|

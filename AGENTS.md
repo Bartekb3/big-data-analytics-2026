@@ -48,7 +48,7 @@ At the start of a task, find your user's area(s): compare `git config user.name`
 1. Read (see above). If the task is unclear against the docs, ask before coding.
 2. Branch from `main`: `<area>/<short-description>` (e.g. `ingestion/roblox-game-poller`).
 3. Code and unit tests together. Run the tests of your area.
-4. If the code needs a contract change: edit the contract file in the same PR, describe the change in the PR description, and make sure the producers and consumers of that contract review it (`.github/CODEOWNERS` requests them automatically). Never code against a contract you changed silently.
+4. If the code needs a contract change: edit the contract file in the same PR, describe the change in the PR description, and request a review from the owners of the producers and consumers of that contract (listed at the top of the contract file). Never code against a contract you changed silently.
 5. Open a PR into `main`; another team member reviews it.
 
 ## Keeping the documentation true
