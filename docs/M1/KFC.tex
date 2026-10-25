@@ -142,9 +142,9 @@ Steam charts, store, appdetails & top 100; 379 popular new releases (10--20\% wi
   \item metadata is sent as \ep{kind=meta} records only when it changes,
   \item Kafka keeps raw messages for 72\,h,
   \item the master dataset is stored as Snappy-compressed Parquet,
-  \item the serving DB keeps 5-min rows for 14 days (time-based retention) and hourly aggregates computed by the batch layer for the whole project.
+  \item the serving DB (MongoDB) keeps 5-min documents for 14 days (time-based retention) and hourly aggregates computed by the batch layer for the whole project.
 \end{itemize}
-The master dataset is about 0.5M source events/day ($\approx$5--8\,MB/day in Parquet), under 1\,GB per semester. Serving tables, indexes, checkpoints and Kafka retention come on top of this; total disk usage will be measured.
+The master dataset is about 0.5M source events/day ($\approx$5--8\,MB/day in Parquet), under 1\,GB per semester. Serving collections, indexes, checkpoints and Kafka retention come on top of this; total disk usage will be measured.
 
 \begin{landscape}
 \begin{figure}[p]
@@ -190,7 +190,7 @@ The master dataset is about 0.5M source events/day ($\approx$5--8\,MB/day in Par
 \node[db=kfcteal] (hdfs) at (14.2,-2.4) {\textbf{Master dataset}\\Parquet on a Docker\\volume, append-only};
 \node[box=kfcteal, text width=3.6cm] (batch) at (19.0,-2.4) {\textbf{Batch layer}\\Spark batch jobs\\(hourly / daily)};
 % serving
-\node[db=kfcblue, text width=3.3cm] (pg) at (24.0,0.6) {\textbf{Serving layer}\\PostgreSQL};
+\node[db=kfcblue, text width=3.3cm] (pg) at (24.0,0.6) {\textbf{Serving layer}\\MongoDB};
 \node[box=kfcpurple, text width=2.8cm] (dash) at (28.4,0.6) {\textbf{Dashboard}\\Streamlit + Plotly};
 
 \draw[arr] (rb.east) -- (prod.north west);
@@ -201,7 +201,7 @@ The master dataset is about 0.5M source events/day ($\approx$5--8\,MB/day in Par
 \draw[arr] (hdfs) -- (batch);
 \draw[arr] (speed.east) -| node[lab, pos=0.3, above=2pt]{5-min rows} (pg.north);
 \draw[arr] (batch.east) -| node[lab, pos=0.3, below=2pt]{hourly aggregates, matches} (pg.south);
-\draw[arr, dashed, draw=kfcteal] (batch.north) -- node[lab, left=2pt, align=right]{model coefficients\\(via PostgreSQL)} (speed.south -| batch.north);
+\draw[arr, dashed, draw=kfcteal] (batch.north) -- node[lab, left=2pt, align=right]{model coefficients\\(via MongoDB)} (speed.south -| batch.north);
 \draw[arr] (pg) -- (dash);
 
 \node[note, above=0.25cm of speed, text width=6.4cm] {every 5 min: dedup, visit deltas, growth,\\Roblox trend score, +3 h projection};
@@ -216,12 +216,12 @@ The master dataset is about 0.5M source events/day ($\approx$5--8\,MB/day in Par
 
 %======================================================================
 \section{Data processing -- high-level data flow}
-Figure~\ref{fig:dfd} (page~\pageref{fig:dfd}) shows the data flow. Each layer in short (deduplication keys, time buckets, partial-update rules, payloads and table schemas are in \ep{docs/contracts.md}):
+Figure~\ref{fig:dfd} (page~\pageref{fig:dfd}) shows the data flow. Each layer in short:
 \begin{itemize}
   \item \textbf{Ingestion:} one \ep{producers} service with Roblox and Steam job groups, a shared rate limiter (about 1 request/s per host), back-off on 429/5xx and field projection; invalid rows are dropped and counted. Two Kafka topics keyed by game ID with 72\,h retention and a \ep{kind} field: \ep{roblox.snapshots} (\ep{game}, \ep{votes}, \ep{sort}, \ep{meta}) and \ep{steam.players} (\ep{players}, \ep{meta}). Game snapshots carry Roblox \ep{updated}, so the update history lives in the master dataset. The tracked list \ep{tracked\_games} is rebuilt once per day: Roblox games seen in ranking lists in the last 7 days plus clone candidates (about 1,500 Roblox and $\le$300 Steam games); the top $\sim$500 Roblox games by players are polled every 5\,min, the rest every 15\,min.
-  \item \textbf{Speed layer} (\ep{speed-job}, Spark Structured Streaming in local mode, 5-min trigger): validates and deduplicates events, computes visit deltas and 1\,h/3\,h/24\,h growth, the Roblox trend score and the +3\,h projection (coefficients read from \ep{model\_coeffs} at the start of each micro-batch), and upserts 5-min rows into \ep{game\_metrics} and metadata into \ep{games}.
-  \item \textbf{Batch layer} (\ep{batch} service, APScheduler, sequential jobs). \emph{Hourly:} Kafka $\rightarrow$ append-only Parquet master dataset (\ep{availableNow} trigger, checkpoint on a volume; 72\,h retention covers a sink outage of up to three days), hourly aggregates computed from Parquet into \ep{game\_metrics\_hourly}, deletion of 5-min rows older than 14 days, retraining and evaluation of both models. \emph{Daily:} \ep{tracked\_games} refresh, clone matching and saturation.
-  \item \textbf{Serving layer:} PostgreSQL with the tables \ep{game\_metrics} (5-min, 14 days), \ep{game\_metrics\_hourly}, \ep{games}, \ep{tracked\_games}, \ep{bv\_matches}, \ep{model\_coeffs}, \ep{model\_health} and \ep{ingest\_stats}.
+  \item \textbf{Speed layer} (\ep{speed-job}, Spark Structured Streaming in local mode, 5-min trigger): validates and deduplicates events, computes visit deltas and 1\,h/3\,h/24\,h growth, the Roblox trend score and the +3\,h projection (coefficients read from \ep{model\_coeffs} at the start of each micro-batch), and upserts 5-min documents into \ep{game\_metrics} and metadata into \ep{games} (\ep{pymongo} bulk upserts in \ep{foreachBatch}; an upsert only overwrites a document when its observation timestamp is newer).
+  \item \textbf{Batch layer} (\ep{batch} service, APScheduler, sequential jobs). \emph{Hourly:} Kafka $\rightarrow$ append-only Parquet master dataset (\ep{availableNow} trigger, checkpoint on a volume; 72\,h retention covers a sink outage of up to three days), hourly aggregates computed from Parquet into \ep{game\_metrics\_hourly}, deletion of 5-min documents older than 14 days, retraining and evaluation of both models. \emph{Daily:} \ep{tracked\_games} refresh, clone matching and saturation.
+  \item \textbf{Serving layer:} MongoDB (document store, single-node replica set) with the collections \ep{game\_metrics} (5-min, 14 days), \ep{game\_metrics\_hourly}, \ep{games}, \ep{tracked\_games}, \ep{bv\_matches}, \ep{model\_coeffs}, \ep{model\_health} and \ep{ingest\_stats}. The semi-structured JSON from the APIs maps directly to documents, the database scales horizontally by sharding, and compound indexes on \ep{(platform, id, ts)} serve the dashboard queries. The replica set enables multi-document transactions, used when the batch layer inserts hourly aggregates and deletes the 5-min documents they replace.
 \end{itemize}
 
 \textbf{Clone matching} (daily, fully automatic):
@@ -255,12 +255,12 @@ The team labels about 100 candidate pairs and reports precision and sample count
 \bottomrule
 \end{longtable}}
 
-\textbf{PostgreSQL serving tables.}
+\textbf{MongoDB serving collections.} One document per row below; the listed key fields (e.g.\ \ep{platform, id, ts}) form a unique compound index used for upserts.
 
 {\small
 \begin{longtable}{L{3.4cm} L{6.6cm} L{4.0cm}}
 \toprule
-\textbf{Table} & \textbf{Main columns} & \textbf{Written by}\\
+\textbf{Collection} & \textbf{Main fields} & \textbf{Written by}\\
 \midrule\endhead
 \ep{game\_metrics} & \ep{platform, id, ts, players, new\_visits, up, down,}\newline\ep{growth\_1h, growth\_3h, growth\_24h, trend\_score,}\newline\ep{projection\_3h} & speed layer (upsert, 5\,min; kept 14 days)\\
 \ep{game\_metrics\_hourly} & \ep{platform, id, hour\_ts, players, peak\_players,}\newline\ep{new\_visits, updated} & batch layer (hourly)\\
@@ -277,7 +277,7 @@ The team labels about 100 candidate pairs and reports precision and sample count
 \section{Dashboard}
 Streamlit + Plotly. It shows only what the sources provide. \emph{Trending now} ranks Roblox games by trend score and Steam games by growth. \emph{Model and data health} is a plain page with three parts: projection MAE against the two baselines per platform, data freshness per feed and API errors. Growth, sparklines, projections and scores appear once enough history has been collected (at least 24\,h for scores and projections).
 
-\textbf{Matched-game navigation.} Selecting a Steam opportunity opens its details and a table of matched Roblox games: clickable name, latest players, 3\,h growth, creation date and match confidence. Selecting a Roblox name opens that game's metrics and player history. Its details show each possible Steam counterpart and, under each one, \emph{Other Roblox games matched to this Steam game}, excluding the current game. These tables reuse the existing matches, metadata and metrics; no separate similarity model or API is needed. Games with no Steam match show their own metrics and an empty-state message. The UI labels these relationships as \emph{matched games} or \emph{possible counterparts}, since the heuristic does not verify copying. Read and navigation rules are defined in \ep{docs/contracts.md}.
+\textbf{Matched-game navigation.} Selecting a Steam opportunity opens its details and a table of matched Roblox games: clickable name, latest players, 3\,h growth, creation date and match confidence. Selecting a Roblox name opens that game's metrics and player history. Its details show each possible Steam counterpart and, under each one, \emph{Other Roblox games matched to this Steam game}, excluding the current game. These tables reuse the existing matches, metadata and metrics; no separate similarity model or API is needed. Games with no Steam match show their own metrics and an empty-state message. The UI labels these relationships as \emph{matched games} or \emph{possible counterparts}, since the heuristic does not verify copying.
 \begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{%
@@ -319,7 +319,7 @@ Streamlit + Plotly. It shows only what the sources provide. \emph{Trending now} 
 
 %======================================================================
 \section{Infrastructure and technologies}
-Everything runs locally with Docker Compose. There are two ready-made images (Kafka, PostgreSQL) and one own image, \ep{app}, which contains Python 3.12, Java 17 and Spark 3.5 with the Kafka connector and PostgreSQL JDBC driver. The \ep{app} image is started as four services that differ only in their \ep{command}. This gives separate logs and restarts while there is still a single Dockerfile. The memory budget (about 6\,GB RAM) is an estimate that has not been verified yet; peak memory of the full stack will be measured.
+Everything runs locally with Docker Compose. There are two ready-made images (Kafka, MongoDB) and one own image, \ep{app}, which contains Python 3.12, Java 17 and Spark 3.5 with the Kafka connector, the MongoDB Spark Connector 10.x (reads for model training) and \ep{pymongo} (conditional upserts, dashboard queries). The \ep{app} image is started as four services that differ only in their \ep{command}. This gives separate logs and restarts while there is still a single Dockerfile. The memory budget (about 6\,GB RAM) is an estimate that has not been verified yet; peak memory of the full stack will be measured.
 \begin{table}[H]
 \centering\small
 \begin{tabularx}{\textwidth}{L{3.0cm} L{3.4cm} Y}
@@ -327,7 +327,7 @@ Everything runs locally with Docker Compose. There are two ready-made images (Ka
 \textbf{Service} & \textbf{Image} & \textbf{Role}\\
 \midrule
 \ep{kafka} & \ep{apache/kafka:3.7.0} (KRaft) & message broker, 2 topics, 72\,h retention\\
-\ep{postgres} & \ep{postgres:16} & serving layer: \ep{game\_metrics}, \ep{game\_metrics\_hourly}, \ep{bv\_matches}, \ep{model\_coeffs}, \ep{model\_health}, metadata\\
+\ep{mongodb} & \ep{mongo:7.0} & serving layer (single-node replica set \ep{rs0}): \ep{game\_metrics}, \ep{game\_metrics\_hourly}, \ep{bv\_matches}, \ep{model\_coeffs}, \ep{model\_health}, metadata\\
 \ep{producers} & \ep{app} & Roblox: ranking lists, games and votes every 5/15 min, search daily; Steam: current players every 15 min, charts, store search and details daily\\
 \ep{speed-job} & \ep{app} & Structured Streaming: metrics, growth, Roblox trend score, +3\,h projection\\
 \ep{batch} & \ep{app} & scheduled sequential jobs: hourly Kafka $\rightarrow$ Parquet sink on volume \ep{/data/master}, hourly aggregates, retention cleanup, model training and evaluation; daily tracked list refresh and matching\\
@@ -348,7 +348,7 @@ Batch storage & Parquet + Snappy on a Docker volume & HDFS, MinIO (S3); switchin
 Batch processing / ML & Apache Spark 3.5 (PySpark, local mode), Spark MLlib linear regression (both models); \ep{rapidfuzz} (titles) and \ep{scikit-learn} TF--IDF (descriptions) for clone matching & Hive, Pandas\\
 Stream processing & Spark Structured Streaming & Apache Flink, Kafka Streams\\
 Scheduling & APScheduler inside the \ep{app} services & Apache Airflow, cron\\
-Serving & PostgreSQL 16 & TimescaleDB, Cassandra\\
+Serving & MongoDB 7 (document store, single-node replica set) & Apache Cassandra, PostgreSQL\\
 Presentation & Streamlit + Plotly & Grafana, Apache Superset\\
 \bottomrule
 \end{tabularx}
@@ -376,7 +376,7 @@ Clone matching false positives above threshold & Medium & Precision measured on 
 \section{Planned use of GenAI tools}
 We will use \textbf{Claude Code} (Anthropic). The repository will contain:
 \begin{itemize}
-  \item a shared \ep{CLAUDE.md} with the architecture and coding conventions, and \ep{docs/contracts.md} with Kafka payloads, table schemas and processing rules (written before any code),
+  \item a shared \ep{CLAUDE.md} with the architecture and coding conventions, and data contracts with Kafka payloads, table schemas and processing rules (written before any code),
   \item a \emph{grill me} skill that critically questions each design or plan before implementation starts,
   \item dedicated implementation skills for recurring parts of the system, e.g.\ an API producer, a Spark Structured Streaming job, a Spark batch job, a new \ep{app} service in Docker Compose, and a Streamlit dashboard view.
 \end{itemize}
@@ -394,7 +394,7 @@ Each area has one owner (\textbf{O}) and up to three supporters (S). The owner o
 Ingestion and Kafka (producers, topics) & S & \own & S & S\\
 Batch layer and ML (Parquet, Spark, MLlib, matching) & S & & \own & S\\
 Speed layer (Structured Streaming) & & S & S & \own\\
-Serving and dashboard (PostgreSQL, Streamlit, contracts) & \own & S & & S\\
+Serving and dashboard (MongoDB, Streamlit, contracts) & \own & S & & S\\
 Compose, app image, scheduling, integration & S & \own & S & \\
 \bottomrule
 \end{tabularx}\par}

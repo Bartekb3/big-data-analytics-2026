@@ -62,7 +62,7 @@
 \node[task, right=0.8cm of p1] (p2) {Publish projected records to Kafka};
 \node[task] (p3) at (14,-10.1) {Speed layer: growth, trend score, +3 h projection};
 \node[task] (p4) at (14,-12.3) {Batch layer: master dataset, aggregates, training, matching};
-\node[task] (p5) at (20,-11.25) {Update serving\\views\\(PostgreSQL)};
+\node[task] (p5) at (20,-11.25) {Update serving\\views\\(MongoDB)};
 \node[endev, right=0.8cm of p5] (pe) {};
 \node[below=1mm of pe, font=\sffamily\scriptsize, align=center] {Views\\refreshed};
 \draw[flow] (t) -- (p1);
