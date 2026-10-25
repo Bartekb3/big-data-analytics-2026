@@ -65,3 +65,4 @@ Parsing and validation are tested against `api_test/responses/*.json`, which hol
 - How "metadata changed" is detected for `meta` events (hash of fields kept in memory vs read from `games`). Owner A.
 - How `sort` games outside the tracked set are handled (they are the input for the next tracked-set rebuild). Owner A with C.
 - Retention of `ingest_stats`. Owner A.
+- Cadence of Roblox `votes`: "every 15 min, same loop as `game`" conflicts with `game` polling every 5 min for games with `poll_minutes` 5 (see [tracked set rules](../batch/README.md#tracked-set-rules)). Is `votes` a separate 15-minute loop? Owner A.

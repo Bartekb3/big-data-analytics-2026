@@ -76,3 +76,4 @@ Commands: [RUNNING.md](../RUNNING.md#running-tests). Coverage: TBD.
 - Scheduler for the hourly and daily sequences (cron in a container, a loop service, ...). Owner C with A (infra).
 - Daily order of tracked set rebuild and clone matching (they depend on each other through `bv_matches` and `is_clone_candidate`). Owner C.
 - What "saturation" as a daily job stores, if anything; the dashboard can compute it from `bv_matches` + `game_metrics`. Owner C with D.
+- Who writes `games` when it is rebuilt from Parquet: the contract lists only speed as its writer. Either batch becomes a writer of [`games`](../contracts/mongodb-collections.md#games) or the rebuild goes through speed. Owner C with B.

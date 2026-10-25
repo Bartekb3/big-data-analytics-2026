@@ -82,3 +82,4 @@ Commands: [RUNNING.md](../RUNNING.md#running-tests). Coverage: TBD.
 ## Open questions
 
 - How growth lookups read history inside a micro-batch (MongoDB reads vs Spark state). Owner B.
+- Trend score needs `genre_l1` and game age (from `created`) from [`games`](../contracts/mongodb-collections.md#games), but `games` is neither in Inputs nor listed as read by speed in the contract. Decide how speed gets them and update Inputs and the contract. Owner B with D.

@@ -59,3 +59,5 @@ Commands: [RUNNING.md](../RUNNING.md#running-tests). Coverage: TBD.
 
 - Exact keys of `coeffs` / `preprocessing` (feature names); they are shared with speed, so agree them with owner B before implementing.
 - Projection is trained on hourly data but applied to 5-minute documents; confirm the slope feature is computed consistently. Owner D with B.
+- The 24 h cold start rule for the trend score lives only here; [`trend_score`](../contracts/mongodb-collections.md#game_metrics) in the contract has no rule for when it is absent. Probably belongs in the contract. Owner D.
+- When `projection_3h` is absent besides the 24 h rule: fewer than 3 observations in the last 3 h for the slope, or no `projection_3h` coefficients yet. Define and add to the contract. Owner D.
