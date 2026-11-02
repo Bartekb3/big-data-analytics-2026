@@ -32,6 +32,9 @@ Single source of truth for the design of GameTrend Radar. Start here, then open 
  [common] shared metric logic used by speed, batch and dashboard
  [infra]  docker compose, Kafka, MongoDB replica set, volumes
  [demo]   accelerated data for the live presentation
+
+ [collector] supporting tool outside the Lambda flow: archives raw API responses
+             (original timestamps) for replay producers
 ```
 
 ## Table of contents
@@ -58,6 +61,7 @@ Single source of truth for the design of GameTrend Radar. Start here, then open 
 | [common/README.md](common/README.md) | shared metric logic and history reads | planned |
 | [infra/README.md](infra/README.md) | docker compose, Kafka, MongoDB, volumes | planned |
 | [demo/README.md](demo/README.md) | accelerated data for the presentation | planned |
+| [collector/README.md](collector/README.md) | raw API archive for replay (supporting tool, not part of the Lambda flow) | in-progress |
 
 Area status here is a summary; the per-module status lives in each area document. Status meanings: [AGENTS.md](../AGENTS.md#keeping-the-documentation-true).
 
@@ -71,3 +75,4 @@ Replace the placeholders and keep `git config user.name` exact (agents use it to
 | B | `speed`, `common` | TODO | TODO | `@TODO-B` |
 | C | `batch`, `matching` | TODO | TODO | `@TODO-C` |
 | D | `ml`, `dashboard` | TODO | TODO | `@TODO-D` |
+| E | `collector` | Jan Cwalina | Janusz99bis | `@TODO-E` |
