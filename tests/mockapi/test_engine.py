@@ -102,7 +102,10 @@ def test_appdetails_has_no_freshness_limit(tmp_path):
                                    games(3000, {1: 1})])  # archive continues for another hour
     clock.set(3500)
     resp = ask(eng, "steam_appdetails", appids=appid)
-    assert resp.status == 200 and resp.body[str(appid)] == body[str(appid)]
+    assert resp.status == 200 and list(resp.body) == [str(appid)]  # top-level keys stay appids, as in the real API
+    served = resp.body[str(appid)]
+    assert served["_mock"] == {"observed_at": "2026-11-02T14:00:10.000Z"}
+    assert {k: v for k, v in served.items() if k != "_mock"} == body[str(appid)]
 
 
 # ------------------------------------------------------------------ errors

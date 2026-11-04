@@ -33,11 +33,11 @@ Package E, see [owners](../README.md#owners).
 
 ## Using the mock from a producer
 
-This section is everything a producer author needs. Commands to start the mock and the reference client: [RUNNING.md](../RUNNING.md#running-each-area). Which event fields come from which API field: [ingestion § API sources](../ingestion/README.md#api-sources-and-cadence) and [kafka-topics](../contracts/kafka-topics.md).
+This section is what a producer author needs to know about the mock. **The producer is the same code for the mock and for the real APIs**; the few differences are settings, listed in [ingestion § Mock and real APIs](../ingestion/README.md#mock-and-real-apis). Commands to start the mock and the reference client: [RUNNING.md](../RUNNING.md#running-each-area). Which event fields come from which API field: [ingestion § API sources](../ingestion/README.md#api-sources-and-cadence) and [kafka-topics](../contracts/kafka-topics.md).
 
 ### In one paragraph
 
-The mock is one HTTP server that answers the same paths and query parameters as the real APIs, with the real response bodies the collector recorded. It has a clock, the **replay time** `A`, which runs like a normal clock but starts in the past (e.g. at the start of the recording). At any moment it answers with what the real API answered at `A` (more precisely: the latest recording made at or before `A`). Asking more often does not give newer data; it gives the same answer again.
+The mock is one HTTP server that answers the same paths and query parameters as the real APIs, with the real response bodies the collector recorded. It has a clock, the **replay time** `A`, which runs like a normal clock but starts in the past (e.g. at the start of the recording). At any moment it answers with what the real API answered at `A` (more precisely: the latest recording made at or before `A`). Asking more often than the data was recorded does not give newer data, only the same answer again; asking at the recording rate gives each recording once.
 
 ### Endpoints
 
@@ -49,7 +49,7 @@ One base URL (e.g. `http://mockapi:8080`) replaces all API hosts (`games.roblox.
 | Roblox votes | `/v1/games/votes` | `universeIds=1,2,3` (up to 50) | `{"data": [item, ...]}` | stream source |
 | Steam players | `/ISteamUserStats/GetNumberOfCurrentPlayers/v1/` | `appid=440` | `{"response": {...}}` | stream source |
 | Roblox sorts | `/explore-api/v1/get-sorts` | `country` (`us`, `br`, `pl`), `sortsPageToken` (from the previous page) | one page of sorts | batch-like (new data every 15 min) |
-| Steam appdetails | `/api/appdetails` | `appids=440` (one ID) | `{"440": {...}}` | once per new Steam game (`meta`) |
+| Steam appdetails | `/api/appdetails` | `appids=440` (one ID) | `{"440": {..., "_mock": {...}}}` | once per new Steam game (`meta`) |
 | Steam charts, store `popularnew`, Roblox search | `/ISteamChartsService/GetMostPlayedGames/v1/`, `/search/results/` (`start`), `/search-api/omni-search` (`searchQuery`) | as the real API | as the real API | not for producers (batch, matching) |
 | IDs to poll | `/_mock/ids` | - | `{"roblox": [ids], "steam": [ids]}`: games with a recent observation | refresh every minute |
 | clock | `/_mock/clock` | - | `replay_time`, `speed`, `archive_start`, `archive_end`, `ended`, `errors`, `inject` | diagnostics |
@@ -58,22 +58,38 @@ Other parameters (`sessionId`, `cc`, `l`, ...) are accepted and ignored. A Roblo
 
 ### Time: use `_mock.observed_at` as `ts`
 
-- Every unit of data carries `"_mock": {"observed_at": "2026-11-02T16:20:56.247Z"}`: on each item of `data[]` (games, votes), on each sorts page, on each whole Steam answer. It is the moment the collector observed that value. **Use it as the event `ts`, unchanged**; never use your own clock ([conventions § Time](../contracts/conventions.md#time)).
+- Every unit of data carries `"_mock": {"observed_at": "2026-11-02T16:20:56.247Z"}`: on each item of `data[]` (games, votes), on each sorts page, on each whole Steam players answer, inside the app's object of an appdetails answer. It is the moment the collector observed that value. **Use it as the event `ts`, unchanged**; never use your own clock ([conventions § Time](../contracts/conventions.md#time)).
 - Every response has the header `X-Mock-Time` = the replay time `A` of that answer. Always `observed_at <= A`.
-- Dates are the original recording dates, so `ts` lies in the past (see Open questions: Kafka `LogAppendTime`).
-- **Drop repeats.** Keep the last `observed_at` per `(endpoint, id)` (per `country` for sorts) and send events only when it changes. A repeated answer means "nothing new yet", not a new observation.
+- Dates are the original recording dates, so `ts` lies in the past. **Do not set the Kafka record timestamp to `ts`**: leave it unset, otherwise the 72 h retention deletes the events at once.
+- **Safeguard against repeats.** Keep the last `observed_at` per `(endpoint, id)` and send events only when it changes (for sorts: per country, by the `observed_at` of the first page). At the recording rate repeats are rare; see below. On the real APIs every answer is new, so this check never fires there. A repeat is not an error and not a dropped record: do not count it in `ingest_stats`.
 - Everything else in the item is the real API item, unchanged; parse it exactly as the real API. Only `nextSortsPageToken` is the mock's own value; pass it back as received.
 
 ### Polling plan (meets the course rule "a request to every stream source at least every 15 s")
 
-1. Every 60 s: `GET /_mock/ids`. Before the `tracked_games` set exists this is the list of IDs to poll. Right after the start of a recording it can be short or empty (the collector's first round is not recorded yet); keep asking every minute.
+Poll at the rate the data was recorded. Each recording is then delivered once, and no faster clock is needed.
+
+1. Every 60 s: `GET /_mock/ids`. Until the `tracked_games` set exists this is the list of IDs to poll. Right after the start of a recording it can be short or empty (the collector's first round is not recorded yet); keep asking every minute.
 2. For each stream source make a **round** of requests: Roblox games and votes, the IDs in batches of 50; Steam players, one request per appid. Let `N` be the number of requests in a round.
-3. Send the next request of the round every `min(10 s, C / N)` seconds, where `C` = 50 s for games and 240 s for votes and Steam players; after the last one start again from the first. The `C / N` part catches the recorded observations (the collector recorded games every ~60-75 s and votes and Steam players every 5 min per ID); the 10 s part keeps the 15 s rule when there are few IDs. Example with 1155 Roblox and 36 Steam IDs: games every 2.1 s (N = 24), votes every 10 s, Steam every 6.7 s.
-   **When the ID list is refreshed, keep the order and the position in the round**: known IDs keep their place, new IDs join at the end, IDs no longer listed leave. Restarting the round at every refresh starves the IDs at the end of the list (measured: a votes round lasts 240 s, so with a restart every 60 s three quarters of the IDs were never asked).
-4. Sorts: every 5 min per country, request without `sortsPageToken`, then follow `nextSortsPageToken` until it is `""`.
-5. Steam appdetails: once per appid not seen before.
-6. HTTP timeout at most 5 s. Keep the schedule even when a request fails or is slow: the next request goes out at its normal time. The mock has no rate limits, so no client-side rate limiter is needed.
-7. Back-off on errors at most 10 s, never longer (see the next table). A longer back-off breaks the 15 s rule and only skips data.
+3. Send the next request of the round every `max(pace, min(cycle / N, 14 s))` seconds; after the last one start again from the first. `pace` and `cycle` are settings, with these starting values (the collector's [pacers](../collector/README.md#pacing-and-back-off) and [job cadences](../collector/README.md#jobs)):
+
+   | source | `pace` | `cycle` | with 1155 Roblox and 178 Steam IDs |
+   |---|---|---|---|
+   | Roblox games | 3 s | 60 s | every 3 s (N = 24) |
+   | Roblox votes | 1 s | 300 s | every 12.5 s (N = 24) |
+   | Steam players | 1 s | 300 s | every 1.7 s (N = 178) |
+
+4. **When the ID list is refreshed, keep the order and the position in the round**: known IDs keep their place, new IDs join at the end, IDs no longer listed leave. Restarting the round at every refresh starves the IDs at the end of the list.
+5. Sorts: every 15 min per country, request without `sortsPageToken`, then follow `nextSortsPageToken` until it is `""`.
+6. Steam appdetails: once per appid not seen before.
+7. Start each request on schedule, without waiting for the previous answer of that source. After a failed request the next one goes out as in [ingestion § Mock and real APIs](../ingestion/README.md#mock-and-real-apis).
+
+**When repeats still appear.** The recording is not perfectly regular, so a constant rate cannot match it exactly:
+
+| situation | what happens | what to do |
+|---|---|---|
+| the collector paused or restarted (a `429` streak, a new run) | a part of the IDs repeat once or skip one recording until the rates line up again | nothing: the safeguard above drops the repeats |
+| a source stopped being recorded while the archive goes on | repeats until the [freshness limit](#freshness-limits), then `503 no-data` | nothing |
+| too few IDs for the 15 s rule at the recording rate: votes below 22 batches (~1050 IDs), Steam below 22 IDs, games below 5 batches (~200 IDs) | the 14 s limit makes the client ask more often than recorded | accept the repeats, or run the mock faster: `REPLAY_SPEED` = (`cycle` / `N`) / 14 |
 
 ### Answers and what to do
 
@@ -82,21 +98,23 @@ Every answer the mock makes itself carries `X-Mock-Reason`; archived answers do 
 | status | `X-Mock-Reason` | meaning | what the producer does |
 |---|---|---|---|
 | 200 | - | data | parse, drop repeats, send events |
-| 404 with body `{"response": {"result": 42}}` | - | recorded Steam answer: the game has no player stats | send no `players` event (missing is not zero) |
-| 404 | `unknown-id` | no recent observation of this ID | send nothing for it this time |
-| 429, 5xx | - | a recorded error of the real API (the mock repeats it while the recording had it, at most 2 min) | count it, retry at the normal schedule (back-off at most 10 s) |
-| 504 | `network-error` | a recorded network error | as above |
-| 429, 500, 504 after a delay | `injected` | test error (only when injection is on) | as above; the delay exceeds the 5 s timeout |
-| 503 | `no-data` | the recording has a gap here: no recent observation of this endpoint | send nothing; keep polling at the normal schedule |
+| 404 with body `{"response": {"result": 42}}` | - | recorded Steam answer: the game has no player stats | no `players` event (missing is not zero), as on the real API |
+| 404 | `unknown-id` | no recent observation of this ID | no event, like any other 404 |
+| 429, 5xx | - | a recorded error of the real API (the mock repeats it while the recording had it, at most 2 min) | the normal error path: count it, back off |
+| 504 | `network-error` | a recorded network error | the normal error path |
+| 429, 500, 504 after a delay | `injected` | test error (only when injection is on) | the normal error path; the delay ends in a client timeout |
+| 503 | `no-data` | the recording has a gap here | the normal error path, no events |
 | 400 | `unknown-token` | sorts token too old (two newer cycles appeared) | start again from the first page |
 | 400 | `bad-request` | malformed parameters | fix the producer |
-| 503 | `end` | the archive is over | stop the producer |
+| 503 | `end` | the archive is over | the normal error path works too (requests keep failing); stopping the producer is optional |
+
+No branch on `X-Mock-Reason` is needed, except that a producer may stop on `end`. Roblox `429` answers carry `x-ratelimit-*` headers and no `Retry-After`, on the mock as on the real API.
 
 Incomplete items (missing fields, `null`) and non-JSON `200` bodies are served as recorded: validate as for the real API.
 
 ### Checking a producer
 
-The mock comes with a reference client, `check` ([RUNNING.md](../RUNNING.md#running-each-area)), that polls with the plan above and reports per source: the largest gap between requests, statuses, new and repeated observations, the newest and the oldest observation relative to `A`, and (with `--data-dir`) whether every answer equals what the archive says it must be and how many of the observations recorded during the run it received. Exit code 0 means: every stream source was requested at least every 15 s, no observation was later than `A`, and no answer differed from the archive. A producer can be checked the same way: no event may have `ts` later than the `X-Mock-Time` of the answer it came from.
+The mock comes with a reference client, `check` ([RUNNING.md](../RUNNING.md#running-each-area)), that polls with the plan above (without back-off) and reports per source: the largest gap between requests, statuses, new and repeated observations, the newest and the oldest observation relative to `A`, and (with `--data-dir`) whether every answer equals what the archive says it must be and how many of the observations recorded during the run it received. Exit code 0 means: every stream source was requested at least every 15 s, no observation was later than `A`, and no answer differed from the archive. A producer can be checked the same way: no event may have `ts` later than the `X-Mock-Time` of the answer it came from.
 
 ## Design / rules
 
@@ -107,7 +125,7 @@ For every response at replay time `A` and every record of feed `f` in it: `A - l
 ### Replay clock
 
 - `A = REPLAY_A0 + (wall_now - REPLAY_START) * REPLAY_SPEED`. All three are configuration; `REPLAY_START` is a fixed wall-clock instant, not the process start, so a restart continues at the same `A`.
-- Defaults: `REPLAY_A0` = start of the archive, `REPLAY_START` = the moment the mock starts, `REPLAY_SPEED` = 1. Speeds above 1 are for the presentation demo only.
+- Defaults: `REPLAY_A0` = start of the archive, `REPLAY_START` = the moment the mock starts, `REPLAY_SPEED` = 1. A speed above 1 moves all sources together, so they stay aligned; the archive then lasts proportionally shorter.
 - Original archive dates are kept: `A` and every served time are real observation times (no offset).
 - To resume after a break, restart with `REPLAY_A0` = the last `A` (logged by the mock when it stops) and a new `REPLAY_START`.
 - `X-Mock-Time` is `A` with millisecond precision; archived times have millisecond precision too, so `observed_at <= X-Mock-Time` holds exactly.
@@ -143,7 +161,7 @@ If a whole feed has no observation within its limit (a collection gap), every re
 Clients must handle errors, so errors are served by default (`MOCKAPI_ERRORS=replay`; `off` serves the latest usable data instead).
 
 - **Error window** per feed: from a failed archived attempt to the next usable one of the same feed, but at most 120 s after the last failure (the collector's back-off cap, so a failure with no later attempt does not block the feed for hours), every request to that feed gets the latest archived failure: its status, body and rate-limit headers. An archived network error is served as `504 network-error`. This matches the recording: during a back-off the collector's pacer blocked the whole feed.
-- **Injection** (`MOCKAPI_INJECT=<p>`, default 0): each request fails with probability `p`: `429` with `Retry-After: 5`, `500`, or `504` after a 35 s delay (beyond any sane client timeout). For tests and the demo.
+- **Injection** (`MOCKAPI_INJECT=<p>`, default 0): each request fails with probability `p`: `429` with `Retry-After: 5`, `500`, or `504` after a 35 s delay (a client normally times out first). For tests and the demo.
 - Precedence: end of archive, injection, error window, `no-data`, then the per-endpoint answer.
 
 ### End of archive
@@ -183,16 +201,14 @@ Commands: [RUNNING.md](../RUNNING.md#running-tests). Unit tests (`tests/mockapi/
 - error windows (status, body, headers, network error, 120 s tail), errors off, non-JSON bodies, injection;
 - sorts cycles, tokens across cycles, unknown tokens, stale cycles; rare lists; `/_mock/ids`; end of archive; unknown paths; `X-Mock-Time`; restart gives identical answers;
 - the engine and the independent oracle agree on every answer of a random request sequence over a 40-minute archive with error windows, Steam 404s, sorts and the end; the oracle flags older, future, missing and wrongly failed answers;
-- the reference client's polling spacing and statistics.
+- the polling plan: spacing at the recording rate, below 15 s with few IDs; polling a regularly recorded archive at the recording rate gives no repeats; the reference client's statistics.
 
 End-to-end check (manual): `serve` on a real archive plus `check --data-dir` against it; see [Checking a producer](#checking-a-producer). Planned integration check with producers and Kafka in `docker compose`: no event has `ts` later than `A`.
 
 ## Open questions
 
 - Replay clock as "now" for every service (retention cutoff, ML evaluation, health page, daily jobs): with original dates a wall-clock "now" would expire all replayed data at once. Needs a line in [conventions](../contracts/conventions.md#time). Owner E with all owners.
-- Kafka topics must use `message.timestamp.type=LogAppendTime` and producers must not set the record timestamp, otherwise old `ts` values make the 72 h retention delete events before the Parquet sink reads them. Owner A ([infra](../infra/README.md)).
-- Ingestion's design has a ~1 request/s per-host rate limiter and uncapped exponential back-off; against the mock (one host, no limits) both would break the 15 s rule. Proposed: no limiter and back-off capped at 10 s when the base URL is the mock. Owner A.
-- Ingestion's `votes` cadence (every 15 min) vs the mock polling plan (votes spaced at most 10 s, repeats dropped): the plan only changes how often the API is asked, not how often events are sent. Owner A.
+- Kafka topics: producers leave the record timestamp unset (see [Time](#time-use-_mockobserved_at-as-ts)); `message.timestamp.type=LogAppendTime` would additionally protect the 72 h retention against a producer that sets it. Owner A ([infra](../infra/README.md)).
 - Re-runs and producer restarts send exact duplicate events; the append-only Parquet dataset needs deduplication by `(platform, id, kind, ts)`. Owner C ([batch](../batch/README.md)).
 - The `sort` event has no field for the sort name; 307 of 896 US games in one sample cycle appear in more than one of 26 sorts with different ranks. Needs a field in [kafka-topics](../contracts/kafka-topics.md#robloxsnapshots). Owner A with C.
 - Producers take IDs from `/_mock/ids` now and from [`tracked_games`](../contracts/mongodb-collections.md#tracked_games) once batch builds it. Owner A with C.

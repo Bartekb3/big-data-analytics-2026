@@ -42,6 +42,11 @@ def with_mock(obj: dict, observed_at: str) -> dict:
     return {**obj, "_mock": {"observed_at": observed_at}}
 
 
+def with_mock_per_app(body: dict, observed_at: str) -> dict:
+    """appdetails: `_mock` inside each app's object, so the top-level keys stay appids as in the real API."""
+    return {k: with_mock(v, observed_at) if isinstance(v, dict) else v for k, v in body.items()}
+
+
 def usable(feed: str, rec: dict) -> bool:
     """A recorded attempt that carries data (else it belongs to an error window)."""
     if is_ok(rec):
@@ -286,25 +291,25 @@ class Engine:
     def _roblox_votes(self, query, now, limit):
         return self._roblox_batch("roblox_votes", query, now, limit)
 
-    def _whole(self, feed: str, key, now: datetime, limit, unknown: Response) -> Response:
+    def _whole(self, feed: str, key, now: datetime, limit, unknown: Response, add_mock=with_mock) -> Response:
         hit = self.state[feed].get(key, now, limit)
         if hit is None:
             return unknown
         rec, _, observed_at = hit
-        return Response(rec["status"], with_mock(rec["body"], observed_at))
+        return Response(rec["status"], add_mock(rec["body"], observed_at))
 
-    def _int_param(self, feed: str, query: dict, name: str, now, limit) -> Response:
+    def _int_param(self, feed: str, query: dict, name: str, now, limit, add_mock=with_mock) -> Response:
         try:
             key = int(first(query, name) or "")
         except ValueError:
             return mock_error(400, "bad-request", f"{name} must be an integer")
-        return self._whole(feed, key, now, limit, mock_error(404, "unknown-id", f"no observation of {key}"))
+        return self._whole(feed, key, now, limit, mock_error(404, "unknown-id", f"no observation of {key}"), add_mock)
 
     def _steam_players(self, query, now, limit):
         return self._int_param("steam_players", query, "appid", now, limit)
 
     def _steam_appdetails(self, query, now, limit):
-        return self._int_param("steam_appdetails", query, "appids", now, limit)
+        return self._int_param("steam_appdetails", query, "appids", now, limit, with_mock_per_app)
 
     def _steam_charts(self, query, now, limit):
         return self._whole("steam_charts", None, now, limit, mock_error(503, "no-data"))

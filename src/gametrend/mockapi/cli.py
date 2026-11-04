@@ -75,7 +75,7 @@ def main(argv=None) -> int:
     c = sub.add_parser("check", help="poll a running mock like the producers would and report gaps and leads")
     c.add_argument("--base-url", default="http://127.0.0.1:8080")
     c.add_argument("--duration", type=float, default=300, help="seconds of wall time")
-    c.add_argument("--timeout", type=float, default=30)
+    c.add_argument("--timeout", type=float, default=10)
     c.add_argument("--data-dir", help="collector data dir: also compare every answer with the archive")
     c.set_defaults(func=cmd_check)
 

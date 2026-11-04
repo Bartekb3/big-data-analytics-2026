@@ -182,8 +182,14 @@ class Oracle:
         r, _ = h
         if status != r["status"]:
             return [f"want {r['status']} (observed {r['requested_at']}), got {status}"]
-        if not isinstance(body, dict) or strip_mock(body) != r["body"] \
-                or body.get("_mock", {}).get("observed_at") != r["requested_at"]:
+        if not isinstance(body, dict):
+            return [f"{key}: body is not an object"]
+        if feed == "steam_appdetails":  # `_mock` sits inside the app's object
+            unit = body.get(str(key), {})
+            served = {k: strip_mock(v) if isinstance(v, dict) else v for k, v in body.items()}
+        else:
+            unit, served = body, strip_mock(body)
+        if served != r["body"] or unit.get("_mock", {}).get("observed_at") != r["requested_at"]:
             return [f"{key}: body differs from the one observed at {r['requested_at']}"]
         return []
 
