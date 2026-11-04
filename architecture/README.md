@@ -35,6 +35,8 @@ Single source of truth for the design of GameTrend Radar. Start here, then open 
 
  [collector] supporting tool outside the Lambda flow: archives raw API responses
              (original timestamps) for replay producers
+ [mockapi]   serves the collector archive in the shape of the real APIs, on a replay
+             clock; ingestion polls it instead of the rate-limited live APIs
 ```
 
 ## Table of contents
@@ -62,6 +64,7 @@ Single source of truth for the design of GameTrend Radar. Start here, then open 
 | [infra/README.md](infra/README.md) | docker compose, Kafka, MongoDB, volumes | planned |
 | [demo/README.md](demo/README.md) | accelerated data for the presentation | planned |
 | [collector/README.md](collector/README.md) | raw API archive for replay (supporting tool, not part of the Lambda flow) | in-progress |
+| [mockapi/README.md](mockapi/README.md) | mock Roblox and Steam APIs serving the archive on a replay clock | in-progress |
 
 Area status here is a summary; the per-module status lives in each area document. Status meanings: [AGENTS.md](../AGENTS.md#keeping-the-documentation-true).
 
@@ -75,4 +78,4 @@ Replace the placeholders and keep `git config user.name` exact (agents use it to
 | B | `speed`, `common` | TODO | TODO | `@TODO-B` |
 | C | `batch`, `matching` | TODO | TODO | `@TODO-C` |
 | D | `ml`, `dashboard` | TODO | TODO | `@TODO-D` |
-| E | `collector` | Jan Cwalina | Janusz99bis | `@TODO-E` |
+| E | `collector`, `mockapi` | Jan Cwalina | Janusz99bis | `@TODO-E` |

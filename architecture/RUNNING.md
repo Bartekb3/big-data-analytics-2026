@@ -7,7 +7,8 @@ How to set up, start and test the project **in its current state of implementati
 | area | can be run? | how |
 |---|---|---|
 | API investigation | yes | `python api_test/api_test.py` (standard library only, calls the real APIs, writes `api_test/responses/`) |
-| all areas | not yet | nothing is implemented; see the [index](README.md) |
+| mock API | yes | see [Running each area](#running-each-area) (no Docker image yet) |
+| other areas | not yet | see the [index](README.md) |
 
 ## Prerequisites
 
@@ -17,10 +18,6 @@ How to set up, start and test the project **in its current state of implementati
 - Java 17 (needed by local PySpark for `spark`-marked tests) - TBD by the `infra` owner
 
 ## Setup
-
-> Not available yet: the root `pyproject.toml` does not exist. The first person adding Python code creates it (Python 3.11, `pytest` as a dev dependency, `spark` marker registered) and replaces this note.
-
-Planned steps:
 
 ```
 uv sync                       # create .venv and install dependencies
@@ -50,6 +47,10 @@ docker compose up -d <services>
 | ml | TBD | MongoDB, Spark |
 | dashboard | TBD | MongoDB |
 | demo | TBD | TBD |
+| mockapi | `uv run python -m gametrend.mockapi serve --data-dir <collector data dir>` | a collector archive |
+| mockapi reference client | `uv run python -m gametrend.mockapi check --base-url http://127.0.0.1:8080 --duration 300 --data-dir <collector data dir>` | a running mock |
+
+`serve` options (each also an environment variable, see `.env.example`): `--port` (8080), `--a0` (replay start, default the archive start), `--start` (wall-clock instant of `--a0`, default now; pass the same pair to continue after a restart), `--speed` (1), `--errors replay|off`, `--inject <p>`. `check` without `--data-dir` only measures gaps and leads; with it, it also compares every answer with the archive. Behaviour: [mockapi](mockapi/README.md#using-the-mock-from-a-producer).
 
 ## Running tests
 
