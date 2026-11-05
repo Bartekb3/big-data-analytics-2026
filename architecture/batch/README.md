@@ -58,7 +58,7 @@ Tracked set rebuild, clone matching ([matching](../matching/README.md)), saturat
 
 ### Recovery and authority
 
-- A sink outage shorter than the [Kafka retention](../contracts/kafka-topics.md#general) loses no data. Longer outages lose the expired offsets: record the gap and mark history incomplete.
+- A sink outage shorter than the [Kafka retention](../contracts/kafka-topics.md#topic-settings) loses no data. Longer outages lose the expired offsets: record the gap and mark history incomplete.
 - Hourly aggregates are authoritative and recomputed from Parquet. `games` and `game_metrics_hourly` can be rebuilt from Parquet after the loss of the MongoDB volume.
 
 ## Code map

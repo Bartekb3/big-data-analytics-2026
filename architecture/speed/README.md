@@ -66,7 +66,7 @@ If a newer observation already exists, the filter does not match, the upsert tri
 
 ### Recovery
 
-- A speed-only outage resumes from the speed checkpoint ([infra](../infra/README.md#design--rules)) as long as it is shorter than the [Kafka retention](../contracts/kafka-topics.md#general).
+- A speed-only outage resumes from the speed checkpoint ([infra](../infra/README.md#design--rules)) as long as it is shorter than the [Kafka retention](../contracts/kafka-topics.md#topic-settings).
 - Timestamp-conditional upserts make replays safe; a unique index alone would let an old replay overwrite newer values.
 
 ## Code map

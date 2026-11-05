@@ -38,6 +38,9 @@ Package A, see [owners](../README.md#owners).
 - Start each request on schedule, without waiting for the previous answer of that source; HTTP timeout 10 s.
 - A repeated observation sends no event and is not counted in `ingest_stats`.
 - At most 50 IDs per Roblox batch call.
+- Kafka client: `partitioner=murmur2_random`. The default of `confluent-kafka` sends a key to a different partition than the Java tools do, which would split one game across partitions.
+- A failed send shows only in the delivery callback: `produce()` raises nothing, and an unknown topic is reported after 30 s. Failed records are counted from there.
+- The producers start after `kafka-init`: [infra § Design](../infra/README.md#design--rules).
 
 ### Mock and real APIs
 

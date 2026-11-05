@@ -61,7 +61,7 @@ Single source of truth for the design of GameTrend Radar. Start here, then open 
 | [ml/README.md](ml/README.md) | expected-players and +3 h projection models | planned |
 | [dashboard/README.md](dashboard/README.md) | Streamlit dashboard | planned |
 | [common/README.md](common/README.md) | shared metric logic and history reads | planned |
-| [infra/README.md](infra/README.md) | docker compose, Kafka, MongoDB, volumes | planned |
+| [infra/README.md](infra/README.md) | docker compose, Kafka, MongoDB, volumes | in-progress |
 | [demo/README.md](demo/README.md) | accelerated data for the presentation | planned |
 | [collector/README.md](collector/README.md) | raw API archive for replay (supporting tool, not part of the Lambda flow) | in-progress |
 | [mockapi/README.md](mockapi/README.md) | mock Roblox and Steam APIs serving the archive on a replay clock | in-progress |
