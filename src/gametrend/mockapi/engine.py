@@ -49,9 +49,9 @@ def with_mock_per_app(body: dict, observed_at: str) -> dict:
 
 def usable(feed: str, rec: dict) -> bool:
     """A recorded attempt that carries data (else it belongs to an error window)."""
-    if is_ok(rec):
-        return True
-    return feed == "steam_players" and rec.get("status") == 404 and "body" in rec  # result 42: no stats
+    if not isinstance(rec.get("body"), dict):
+        return False  # text or JSON that is not an object (e.g. `null`): served as recorded, as an error window
+    return is_ok(rec) or (feed == "steam_players" and rec.get("status") == 404)  # result 42: no stats
 
 
 def mock_error(status: int, reason: str, message: str | None = None) -> Response:
@@ -182,10 +182,12 @@ class Engine:
 
     # ---- archive -> state
 
-    def advance(self, now: datetime) -> None:
+    def _rescan_bounds(self, now: datetime) -> None:
         if now - self._bounds_at >= config.RESCAN_EVERY:
             self.archive_start, self.archive_end = archive_bounds(self.raw_dir, config.FEEDS)
             self._bounds_at = now
+
+    def advance(self, now: datetime) -> None:
         for feed, reader in self.readers.items():
             for rec in reader.take_until(now):
                 self._apply(feed, rec)
@@ -204,13 +206,14 @@ class Engine:
     # ---- requests
 
     def answer(self, path: str, query: dict[str, list[str]]) -> Response:
-        now = self.clock.now()
         with self._lock:
+            now = self.clock.now()  # inside the lock: a request that waited must not get state newer than its time
             resp = self._answer(path.rstrip("/") or "/", query, now)
         resp.headers = {"X-Mock-Time": utc_iso(now), **resp.headers}
         return resp
 
     def _answer(self, path: str, query: dict, now: datetime) -> Response:
+        self._rescan_bounds(now)  # before the end check: a new hour ends the `end` state
         if path == "/_mock/clock":
             return Response(200, self.clock_info(now))
         feed = config.PATH_FEED.get(path)
@@ -278,6 +281,8 @@ class Engine:
             ids = [int(x) for x in (first(query, "universeIds") or "").split(",") if x.strip()]
         except ValueError:
             return mock_error(400, "bad-request", "universeIds must be comma-separated integers")
+        if not ids or (feed == "roblox_games" and len(ids) > config.MAX_GAMES_IDS):
+            return mock_error(400, "bad-request", f"{len(ids)} IDs requested")
         data = []
         for uid in ids:
             hit = self.state[feed].get(uid, now, limit)
@@ -329,7 +334,7 @@ class Engine:
         cycles = sorts.complete.get(country or "")
         if not cycles:
             return mock_error(503, "no-data", f"no complete sorts cycle for country {country}")
-        token = first(query, "sortsPageToken")
+        token = first(query, "sortsPageToken") or None  # blank: the first page, as on the real API
         if token is None:
             pages, n = cycles[-1], 0
             if now - pages[-1][1] > limit:

@@ -9,6 +9,7 @@ import heapq
 import json
 import logging
 import re
+import zlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -43,19 +44,24 @@ def hour_groups(feed_dir: Path) -> dict[datetime, list[Path]]:
 
 
 def read_file(path: Path, counts: dict):
-    """Records of one file, skipping broken lines (counted in counts["broken_lines"])."""
-    with gzip.open(path, "rt", encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rec = json.loads(line)
-                rec["_t"] = parse_utc(rec["requested_at"])
-            except (ValueError, KeyError, TypeError):
-                counts["broken_lines"] = counts.get("broken_lines", 0) + 1
-                continue
-            yield rec
+    """Records of one file, skipping broken lines (counted in counts["broken_lines"]). A file that cannot be read
+    to its end (e.g. copied only in part) gives what it has (logged, counted in counts["broken_files"])."""
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                    rec["_t"] = parse_utc(rec["requested_at"])
+                except (ValueError, KeyError, TypeError):
+                    counts["broken_lines"] = counts.get("broken_lines", 0) + 1
+                    continue
+                yield rec
+    except (OSError, EOFError, zlib.error, UnicodeDecodeError) as e:
+        counts["broken_files"] = counts.get("broken_files", 0) + 1
+        log.warning("%s: cannot read to its end, the rest is skipped: %s", path, e)
 
 
 def merge_hour(paths: list[Path], counts: dict):

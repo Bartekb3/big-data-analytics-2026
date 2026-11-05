@@ -54,7 +54,7 @@ One base URL (e.g. `http://mockapi:8080`) replaces all API hosts (`games.roblox.
 | IDs to poll | `/_mock/ids` | - | `{"roblox": [ids], "steam": [ids]}`: games with a recent observation | refresh every minute |
 | clock | `/_mock/clock` | - | `replay_time`, `speed`, `archive_start`, `archive_end`, `ended`, `errors`, `inject` | diagnostics |
 
-Other parameters (`sessionId`, `cc`, `l`, ...) are accepted and ignored. A Roblox batch answer leaves out the IDs that have no recent observation; ask for any grouping of IDs, the mock regroups.
+As on the real APIs, `/v1/games` rejects more than 50 IDs and both Roblox endpoints reject an empty ID list (`400 bad-request`), and a blank `sortsPageToken` means the first page. Other parameters (`sessionId`, `cc`, `l`, ...) are accepted and ignored. A Roblox batch answer leaves out the IDs that have no recent observation; ask for any grouping of IDs, the mock regroups.
 
 ### Time: use `_mock.observed_at` as `ts`
 
@@ -80,7 +80,7 @@ Poll at the rate the data was recorded. Each recording is then delivered once, a
 
 4. **When the ID list is refreshed, keep the order and the position in the round**: known IDs keep their place, new IDs join at the end, IDs no longer listed leave. Restarting the round at every refresh starves the IDs at the end of the list.
 5. Sorts: every 15 min per country, request without `sortsPageToken`, then follow `nextSortsPageToken` until it is `""`.
-6. Steam appdetails: once per appid not seen before.
+6. Steam appdetails: for each new appid, until it gets a `200` (`success: false` counts: the game has no details). After a `404` or `503` ask again at the next ID refresh: on the mock an ID can be listed before its details were recorded, and on the real API the request can fail.
 7. Start each request on schedule, without waiting for the previous answer of that source. After a failed request the next one goes out as in [ingestion § Mock and real APIs](../ingestion/README.md#mock-and-real-apis).
 
 **When repeats still appear.** The recording is not perfectly regular, so a constant rate cannot match it exactly:
@@ -110,7 +110,7 @@ Every answer the mock makes itself carries `X-Mock-Reason`; archived answers do 
 
 No branch on `X-Mock-Reason` is needed, except that a producer may stop on `end`. Roblox `429` answers carry `x-ratelimit-*` headers and no `Retry-After`, on the mock as on the real API.
 
-Incomplete items (missing fields, `null`) and non-JSON `200` bodies are served as recorded: validate as for the real API.
+Incomplete items (missing fields, `null`) and `200` bodies that are not a JSON object (text, `null`) are served as recorded: validate as for the real API.
 
 ### Checking a producer
 
@@ -166,11 +166,11 @@ Clients must handle errors, so errors are served by default (`MOCKAPI_ERRORS=rep
 
 ### End of archive
 
-When `A` passes the end of the last archived hour, every request gets `503 end`; clients stop. Switching to the real APIs later is a base-URL change in the clients.
+When `A` passes the end of the last archived hour, every request gets `503 end`; clients stop. If a new hour appears later (follow mode), the mock answers again within a minute of replay time. Switching to the real APIs later is a base-URL change in the clients.
 
 ### Archive reading
 
-- Only closed hours (`.gz`) are read. Several files of one hour (`HH.jsonl.gz`, `HH.1.jsonl.gz`, ...) are merged by `requested_at`. Broken lines are skipped and counted.
+- Only closed hours (`.gz`) are read. Several files of one hour (`HH.jsonl.gz`, `HH.1.jsonl.gz`, ...) are merged by `requested_at`. Broken lines are skipped and counted; a file that cannot be read to its end gives what it has and is logged and counted.
 - Follow mode: new files are picked up every minute (of replay time), so the archive can keep growing while the mock runs. A file of an hour that was already replayed is ignored with a warning.
 - Memory holds only the latest observation per ID, the last two sorts cycles per country and the latest rare responses. At start the mock reads back each feed's freshness limit (all of appdetails).
 - A response depends only on `A` and the archive, so restarts are deterministic; no state files.
@@ -201,6 +201,7 @@ Commands: [RUNNING.md](../RUNNING.md#running-tests). Unit tests (`tests/mockapi/
 - error windows (status, body, headers, network error, 120 s tail), errors off, non-JSON bodies, injection;
 - sorts cycles, tokens across cycles, unknown tokens, stale cycles; rare lists; `/_mock/ids`; end of archive; unknown paths; `X-Mock-Time`; restart gives identical answers;
 - the engine and the independent oracle agree on every answer of a random request sequence over a 40-minute archive with error windows, Steam 404s, sorts and the end; the oracle flags older, future, missing and wrongly failed answers;
+- `end` left when a new hour arrives, overlapping requests, recorded `200` bodies that are not a JSON object, unreadable files, lone surrogates, requests the real APIs reject (50 IDs, empty list, blank token);
 - the polling plan: spacing at the recording rate, below 15 s with few IDs; polling a regularly recorded archive at the recording rate gives no repeats; the reference client's statistics.
 
 End-to-end check (manual): `serve` on a real archive plus `check --data-dir` against it; see [Checking a producer](#checking-a-producer). Planned integration check with producers and Kafka in `docker compose`: no event has `ts` later than `A`.

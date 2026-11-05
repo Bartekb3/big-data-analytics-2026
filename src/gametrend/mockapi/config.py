@@ -43,6 +43,7 @@ RESCAN_EVERY = timedelta(seconds=60)  # follow mode: look for new archive files 
 # an error window lasts until the next usable attempt of the feed, but at most this long after its last
 # failure (the collector's back-off cap): a failure with no later attempt must not block the feed for hours
 ERROR_WINDOW_TAIL = timedelta(seconds=120)
+MAX_GAMES_IDS = 50  # the real /v1/games answers 400 above this (the real votes endpoint accepted 51)
 SORT_CYCLES_KEPT = 2  # complete cycles kept per country, so tokens of the previous cycle still work
 
 

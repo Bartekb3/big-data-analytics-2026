@@ -78,7 +78,8 @@ class Archive:
                 self._close(feed)
             if feed not in self._open:
                 path.parent.mkdir(parents=True, exist_ok=True)
-                self._open[feed] = (path, open(path, "a", encoding="utf-8"))
+                # backslashreplace: a lone surrogate (valid in JSON, not in UTF-8) is written as its JSON escape
+                self._open[feed] = (path, open(path, "a", encoding="utf-8", errors="backslashreplace"))
             fh = self._open[feed][1]
             fh.write(line)
             fh.flush()

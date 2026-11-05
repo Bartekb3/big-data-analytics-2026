@@ -24,6 +24,8 @@ uv sync                       # create .venv and install dependencies
 cp .env.example .env          # local configuration (never commit .env)
 ```
 
+`.env` is not loaded automatically: pass it to the command, e.g. `uv run --env-file .env python -m gametrend.mockapi serve`.
+
 ## Infrastructure
 
 > Not available yet: `docker-compose.yml` is owned by `infra`. Document here which services exist, how to start them and on which ports.

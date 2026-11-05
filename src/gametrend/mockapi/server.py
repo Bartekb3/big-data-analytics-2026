@@ -13,8 +13,10 @@ log = logging.getLogger(__name__)
 
 def encode(resp: Response) -> tuple[bytes, str]:
     if isinstance(resp.body, str):
-        return resp.body.encode("utf-8"), "text/plain; charset=utf-8"
-    return json.dumps(resp.body, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), "application/json"
+        return resp.body.encode("utf-8", "backslashreplace"), "text/plain; charset=utf-8"
+    # backslashreplace: a lone surrogate (valid in JSON, not in UTF-8) goes out as its JSON escape (\ud83d)
+    return json.dumps(resp.body, ensure_ascii=False, separators=(",", ":")).encode("utf-8", "backslashreplace"), \
+        "application/json"
 
 
 def make_server(engine: Engine, host: str, port: int, stop: threading.Event) -> ThreadingHTTPServer:
