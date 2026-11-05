@@ -31,8 +31,8 @@ Both topics:
 
 | setting | value | why |
 |---|---|---|
-| `retention.ms` | `259200000` (72 h) | how long events stay readable |
-| `segment.ms` | `86400000` (24 h) | Kafka deletes only closed log segments; at our volume a segment would otherwise stay open for days, and the retention would not take effect |
+| `retention.ms` | `259200000` (72 h) | the shortest time events stay readable |
+| `segment.ms` | `86400000` (24 h) | Kafka deletes a whole segment, once its newest record is past `retention.ms`, so events stay readable for 72 h to about 96 h; with the default segment time (7 days) it would be up to about 10 days |
 | `message.timestamp.type` | `LogAppendTime` | the record timestamp is the broker's time, so replayed events with an old `ts` do not expire at once |
 
 Consumers take event time from `ts`, never from the record timestamp.

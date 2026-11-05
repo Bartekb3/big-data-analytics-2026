@@ -60,7 +60,7 @@ As on the real APIs, `/v1/games` rejects more than 50 IDs and both Roblox endpoi
 
 - Every unit of data carries `"_mock": {"observed_at": "2026-11-02T16:20:56.247Z"}`: on each item of `data[]` (games, votes), on each sorts page, on each whole Steam players answer, inside the app's object of an appdetails answer. It is the moment the collector observed that value. **Use it as the event `ts`, unchanged**; never use your own clock ([conventions § Time](../contracts/conventions.md#time)).
 - Every response has the header `X-Mock-Time` = the replay time `A` of that answer. Always `observed_at <= A`.
-- Dates are the original recording dates, so `ts` lies in the past. **Do not set the Kafka record timestamp to `ts`**: leave it unset, otherwise the 72 h retention deletes the events at once.
+- Dates are the original recording dates, so `ts` lies in the past. **Do not set the Kafka record timestamp to `ts`**: leave it unset. Event time travels only in `ts`, and the old dates do not expire because of the [topic settings](../contracts/kafka-topics.md#topic-settings).
 - **Safeguard against repeats.** Keep the last `observed_at` per `(endpoint, id)` and send events only when it changes (for sorts: per country, by the `observed_at` of the first page). At the recording rate repeats are rare; see below. On the real APIs every answer is new, so this check never fires there. A repeat is not an error and not a dropped record: do not count it in `ingest_stats`.
 - Everything else in the item is the real API item, unchanged; parse it exactly as the real API. Only `nextSortsPageToken` is the mock's own value; pass it back as received.
 
