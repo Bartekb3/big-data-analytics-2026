@@ -58,7 +58,7 @@ Everything else is the same: parsing, validation, rate limiter, polling plan, re
 |---|---|---|
 | Roblox `game` | `games.roblox.com/v1/games` (`playing`, `visits`, `favoritedCount` -> `favorites`, `updated`) | [polling plan](../mockapi/README.md#polling-plan-meets-the-course-rule-a-request-to-every-stream-source-at-least-every-15-s); `poll_minutes` of the game (from `tracked_games`) is the slowest allowed |
 | Roblox `votes` | `games.roblox.com/v1/games/votes` (`upVotes` -> `up`, `downVotes` -> `down`) | polling plan, its own 50-ID loop |
-| Roblox `sort` | `explore-api/v1/get-sorts` (`playerCount` -> `playing`), 3 countries | every 15 min |
+| Roblox `sort` | `explore-api/v1/get-sorts`, 3 countries, each entry of `sorts[]` with `contentType` `Games` (`sortId` -> `sort`, position in its `games[]` -> `rank`, `playerCount` -> `playing`) | every 15 min |
 | Roblox `meta` | `games.roblox.com/v1/games` (`name`, `genre_l1`, `genre_l2`, `created`, `description`) | only when the metadata changes |
 | Steam `players` | `ISteamUserStats/GetNumberOfCurrentPlayers` (`player_count` -> `players`) | polling plan; `poll_minutes` of the game is the slowest allowed |
 | Steam `meta` | `store.steampowered.com/api/appdetails` (`name`, `genres[].description` -> `genres`, `release_date.date` -> `released`, `short_description`) | when a game is first seen or its metadata changes |

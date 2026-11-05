@@ -27,7 +27,7 @@ None.
 
 Running services that implement the storage side of the contracts:
 
-- Kafka topics from [kafka-topics.md](../contracts/kafka-topics.md), with the retention defined there.
+- Kafka topics from [kafka-topics.md](../contracts/kafka-topics.md#topic-settings), with the settings defined there.
 - MongoDB database `gametrend` with the collections and indexes from [mongodb-collections.md](../contracts/mongodb-collections.md).
 - The `/data/master` volume for the [Parquet master dataset](../contracts/parquet-master.md).
 

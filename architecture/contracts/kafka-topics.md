@@ -7,8 +7,8 @@
 
 - Encoding: JSON, one event per message.
 - Message key: the game `id` (as a string of digits).
-- Retention: 72 h.
 - Only the fields listed here are sent. Records that fail validation are dropped by the producer and counted in [`ingest_stats`](mongodb-collections.md#ingest_stats).
+- Every field listed is required, so a record without one fails validation, except in `meta` events: there only `name` is required, and a field the API has no value for is absent ([missing values](conventions.md#missing-values)).
 
 Common fields of every event:
 
@@ -17,6 +17,25 @@ Common fields of every event:
 | `kind` | string | event kind, see the tables below |
 | `ts` | ISO-8601 UTC string | producer observation time, see [conventions](conventions.md#time) |
 | `id` | integer | Roblox `universeId` / Steam `appid` |
+
+### Topic settings
+
+[infra](../infra/README.md) creates the topics at startup with these settings. Automatic topic creation is off, so a mistyped topic name fails instead of creating a new topic.
+
+| topic | partitions | replication factor |
+|---|---|---|
+| `roblox.snapshots` | 3 | 1 |
+| `steam.players` | 1 | 1 |
+
+Both topics:
+
+| setting | value | why |
+|---|---|---|
+| `retention.ms` | `259200000` (72 h) | how long events stay readable |
+| `segment.ms` | `86400000` (24 h) | Kafka deletes only closed log segments; at our volume a segment would otherwise stay open for days, and the retention would not take effect |
+| `message.timestamp.type` | `LogAppendTime` | the record timestamp is the broker's time, so replayed events with an old `ts` do not expire at once |
+
+Consumers take event time from `ts`, never from the record timestamp.
 
 ## `roblox.snapshots`
 
@@ -29,7 +48,8 @@ Common fields of every event:
 | `votes` | `up` | integer | cumulative up-votes |
 | | `down` | integer | cumulative down-votes |
 | `sort` | `country` | string | country of the explore sort |
-| | `rank` | integer | position of the game in that sort |
+| | `sort` | string | ID of the explore sort (e.g. `top-trending`) |
+| | `rank` | integer | position of the game in that sort, starting at 1 |
 | | `playing` | integer | player count shown in the sort |
 | `meta` | `name` | string | game name |
 | | `genre_l1` | string | top-level genre |
@@ -38,6 +58,8 @@ Common fields of every event:
 | | `description` | string | game description |
 
 `updated` travels with every `game` event, so the Roblox update history is kept in the master dataset.
+
+A game can be in several sorts of one country at once, so one observation gives one `sort` event per sort. `(id, ts, country, sort)` identifies a `sort` event.
 
 ## `steam.players`
 
