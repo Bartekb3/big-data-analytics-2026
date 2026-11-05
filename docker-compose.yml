@@ -39,5 +39,22 @@ services:
       retries: 10
       start_period: 15s
 
+  # Runs once when the broker is healthy, then exits. "up --wait" does not wait for it or report its failure:
+  # use "docker compose up -d && docker compose wait kafka-init" (alone, wait returns 0 for an init that never
+  # started), or depends_on with service_completed_successfully in a service.
+  kafka-init:
+    image: apache/kafka:3.7.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./infra/create-topics.sh:/create-topics.sh:ro
+    # Same reason as in kafka, plus the data path, which this service does not use.
+    tmpfs:
+      - /etc/kafka/secrets
+      - /mnt/shared/config
+      - /var/lib/kafka/data
+    command: ["sh", "/create-topics.sh"]
+
 volumes:
   kafka-data:
