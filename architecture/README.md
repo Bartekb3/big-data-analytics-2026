@@ -50,7 +50,7 @@ Single source of truth for the design of GameTrend Radar. Start here, then open 
 | [_template.md](_template.md) | structure of an area document | - |
 | **Contracts** | | |
 | [contracts/conventions.md](contracts/conventions.md) | types, timestamps, IDs, missing values, keys | agreed |
-| [contracts/kafka-topics.md](contracts/kafka-topics.md) | Kafka topics, event payloads, Kafka retention, producers and consumers | agreed |
+| [contracts/kafka-topics.md](contracts/kafka-topics.md) | Kafka topics and their settings (partitions, retention), event payloads, producers and consumers | agreed |
 | [contracts/parquet-master.md](contracts/parquet-master.md) | Parquet master dataset (location, format, content, retention), its producers and consumers | agreed (partly open) |
 | [contracts/mongodb-collections.md](contracts/mongodb-collections.md) | MongoDB collections, keys, field semantics, metric definitions, writers, readers, retention | agreed |
 | **Areas** (each also owns its per-module status, design rules, code map and test coverage) | | |
@@ -61,7 +61,7 @@ Single source of truth for the design of GameTrend Radar. Start here, then open 
 | [ml/README.md](ml/README.md) | expected-players and +3 h projection models | planned |
 | [dashboard/README.md](dashboard/README.md) | Streamlit dashboard | planned |
 | [common/README.md](common/README.md) | shared metric logic and history reads | planned |
-| [infra/README.md](infra/README.md) | docker compose, Kafka, MongoDB, volumes | planned |
+| [infra/README.md](infra/README.md) | docker compose, Kafka, MongoDB, volumes | in-progress |
 | [demo/README.md](demo/README.md) | accelerated data for the presentation | planned |
 | [collector/README.md](collector/README.md) | raw API archive for replay (supporting tool, not part of the Lambda flow) | in-progress |
 | [mockapi/README.md](mockapi/README.md) | mock Roblox and Steam APIs serving the archive on a replay clock | in-progress |
@@ -74,7 +74,7 @@ Replace the placeholders and keep `git config user.name` exact (agents use it to
 
 | package | areas | owner | `git config user.name` | GitHub |
 |---|---|---|---|---|
-| A | `ingestion`, `infra`, `demo` | TODO | TODO | `@TODO-A` |
+| A | `ingestion`, `infra`, `demo` | Jan Cwalina | Janusz99bis | `@TODO-A` |
 | B | `speed`, `common` | TODO | TODO | `@TODO-B` |
 | C | `batch`, `matching` | TODO | TODO | `@TODO-C` |
 | D | `ml`, `dashboard` | TODO | TODO | `@TODO-D` |

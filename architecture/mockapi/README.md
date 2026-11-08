@@ -60,7 +60,7 @@ As on the real APIs, `/v1/games` rejects more than 50 IDs and both Roblox endpoi
 
 - Every unit of data carries `"_mock": {"observed_at": "2026-11-02T16:20:56.247Z"}`: on each item of `data[]` (games, votes), on each sorts page, on each whole Steam players answer, inside the app's object of an appdetails answer. It is the moment the collector observed that value. **Use it as the event `ts`, unchanged**; never use your own clock ([conventions § Time](../contracts/conventions.md#time)).
 - Every response has the header `X-Mock-Time` = the replay time `A` of that answer. Always `observed_at <= A`.
-- Dates are the original recording dates, so `ts` lies in the past. **Do not set the Kafka record timestamp to `ts`**: leave it unset, otherwise the 72 h retention deletes the events at once.
+- Dates are the original recording dates, so `ts` lies in the past. **Do not set the Kafka record timestamp to `ts`**: leave it unset. Event time travels only in `ts`, and the old dates do not expire because of the [topic settings](../contracts/kafka-topics.md#topic-settings).
 - **Safeguard against repeats.** Keep the last `observed_at` per `(endpoint, id)` and send events only when it changes (for sorts: per country, by the `observed_at` of the first page). At the recording rate repeats are rare; see below. On the real APIs every answer is new, so this check never fires there. A repeat is not an error and not a dropped record: do not count it in `ingest_stats`.
 - Everything else in the item is the real API item, unchanged; parse it exactly as the real API. Only `nextSortsPageToken` is the mock's own value; pass it back as received.
 
@@ -209,9 +209,7 @@ End-to-end check (manual): `serve` on a real archive plus `check --data-dir` aga
 ## Open questions
 
 - Replay clock as "now" for every service (retention cutoff, ML evaluation, health page, daily jobs): with original dates a wall-clock "now" would expire all replayed data at once. Needs a line in [conventions](../contracts/conventions.md#time). Owner E with all owners.
-- Kafka topics: producers leave the record timestamp unset (see [Time](#time-use-_mockobserved_at-as-ts)); `message.timestamp.type=LogAppendTime` would additionally protect the 72 h retention against a producer that sets it. Owner A ([infra](../infra/README.md)).
-- Re-runs and producer restarts send exact duplicate events; the append-only Parquet dataset needs deduplication by `(platform, id, kind, ts)`. Owner C ([batch](../batch/README.md)).
-- The `sort` event has no field for the sort name; 307 of 896 US games in one sample cycle appear in more than one of 26 sorts with different ranks. Needs a field in [kafka-topics](../contracts/kafka-topics.md#robloxsnapshots). Owner A with C.
+- Re-runs and producer restarts send exact duplicate events; the append-only Parquet dataset needs deduplication by `(platform, id, kind, ts)`, and for `sort` events also `country` and `sort` ([kafka-topics](../contracts/kafka-topics.md#robloxsnapshots)). Owner C ([batch](../batch/README.md)).
 - Producers take IDs from `/_mock/ids` now and from [`tracked_games`](../contracts/mongodb-collections.md#tracked_games) once batch builds it. Owner A with C.
 - Move the raw record format to `contracts/raw-archive.md` (the mock is its first reader). Owner E.
 - Where the mock and the pipeline run and how the archive gets there from the collecting computer (proposed: copy closed `.gz` hours, e.g. `rsync` every hour). Owner E.
