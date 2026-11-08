@@ -35,3 +35,12 @@
 # Compilation output folder: ignore everything except PDFs
 compiled/*
 !compiled/*.pdf
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Locally collected data (collector default lives outside the repo; this guards accidents)
+data/
