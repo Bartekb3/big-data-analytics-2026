@@ -1,5 +1,24 @@
-# Keeps names the same in every clone and worktree: gametrend_kafka-data, gametrend_default.
+# Keeps names the same in every clone and worktree: gametrend_kafka-data, gametrend_mongo-data, ..., gametrend_default.
 name: gametrend
+
+# Shared by the Spark jobs (speed, batch): one image, local mode, code bind-mounted read-only.
+# Started only with the "spark" profile: docker compose --profile spark up -d.
+x-spark: &spark
+  image: gametrend-spark:dev
+  build:
+    context: .
+    dockerfile: infra/spark/Dockerfile
+  profiles: ["spark"]
+  depends_on:
+    kafka-init:
+      condition: service_completed_successfully
+    mongo-init:
+      condition: service_completed_successfully
+
+# Addresses inside the compose network; .env is not loaded, so the values for this computer cannot leak in.
+x-spark-env: &spark-env
+  KAFKA_BOOTSTRAP: kafka:9092
+  MONGO_URI: mongodb://mongodb:27017/?replicaSet=rs0
 
 services:
   kafka:
@@ -26,6 +45,9 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # JVM option, not a broker setting (the default is 1G); keeps the whole stack within a laptop's Docker Desktop.
+      KAFKA_HEAP_OPTS: -Xms512m -Xmx512m
+    mem_limit: 1g
     volumes:
       - kafka-data:/var/lib/kafka/data
     # Unused paths the image declares as volumes; without this every down + up leaves two anonymous volumes behind.
@@ -56,5 +78,82 @@ services:
       - /var/lib/kafka/data
     command: ["sh", "/create-topics.sh"]
 
+  # Single-node replica set rs0 (needed for multi-document transactions). No authentication: localhost only.
+  mongodb:
+    image: mongo:7.0.16
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.5"]
+    ports:
+      # From this computer connect with directConnection=true: the member name "mongodb" does not resolve here.
+      - "127.0.0.1:27017:27017"
+    mem_limit: 1g
+    volumes:
+      # Also holds the replica set configuration, so rs0 survives down + up.
+      - mongo-data:/data/db
+    # Declared as a volume by the image, used only by sharding config servers.
+    tmpfs:
+      - /data/configdb
+    # Only "is mongod up": the replica set is initiated later by mongo-init, which waits for this check.
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+
+  # Runs once when mongod is healthy: initiates rs0 if needed, waits for PRIMARY, creates the contract's indexes,
+  # then exits. Same rules as kafka-init: wait for it with "docker compose wait", or depend on it with
+  # service_completed_successfully.
+  mongo-init:
+    image: mongo:7.0.16
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./infra/init-mongo.js:/init-mongo.js:ro
+    # Paths the image declares as volumes; this service uses neither.
+    tmpfs:
+      - /data/db
+      - /data/configdb
+    command: ["mongosh", "--host", "mongodb", "--quiet", "--file", "/init-mongo.js"]
+
+  speed:
+    <<: *spark
+    command: ["python", "-m", "gametrend.speed"]
+    environment:
+      <<: *spark-env
+      SPARK_DRIVER_MEMORY: 1g
+      SPEED_CHECKPOINT_DIR: /data/checkpoints/speed
+    mem_limit: 2g
+    ports:
+      - "127.0.0.1:4040:4040"    # Spark UI
+    volumes:
+      - ./src:/app/src:ro
+      - ./tests:/app/tests:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - speed-checkpoint:/data/checkpoints/speed
+
+  batch:
+    <<: *spark
+    command: ["python", "-m", "gametrend.batch"]
+    environment:
+      <<: *spark-env
+      SPARK_DRIVER_MEMORY: 1500m
+      ARCHIVE_CHECKPOINT_DIR: /data/checkpoints/archive
+      MASTER_DIR: /data/master
+    mem_limit: 2560m
+    ports:
+      - "127.0.0.1:4041:4040"    # Spark UI
+    volumes:
+      - ./src:/app/src:ro
+      - ./tests:/app/tests:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - archive-checkpoint:/data/checkpoints/archive
+      # Parquet master dataset: append-only, never deleted. "docker compose down -v" DELETES it too.
+      - master-data:/data/master
+
 volumes:
   kafka-data:
+  mongo-data:
+  speed-checkpoint:
+  archive-checkpoint:
+  master-data:

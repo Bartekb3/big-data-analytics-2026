@@ -80,11 +80,12 @@ Commands: [RUNNING.md](../RUNNING.md#running-tests).
 
 Parsing and validation are tested against `api_test/responses/*.json`, which holds a recorded response of every endpoint, and against the same responses from the mock (with `_mock`).
 
+Development, verification and the demo run against the mock; a run against the real APIs is not required (same code path, only the base URLs differ).
+
 The mock does not react to load, so it cannot show that the limiter or the back-off work. Required before calling this area done:
 
 - limiter and back-off: unit tests with a fake clock;
 - metadata change detection: unit tests (the mock has one recorded `appdetails` per game);
-- a short run against the real APIs (tests marked `live`), to confirm the same code stays within the real limits;
 - a run against the mock with its reference client's criteria: [Checking a producer](../mockapi/README.md#checking-a-producer).
 
 ## Open questions

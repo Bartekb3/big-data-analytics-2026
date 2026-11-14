@@ -46,3 +46,5 @@ __pycache__/
 data/
 gametrend-data/
 priv/
+# Parquet master dataset copied out of its Docker volume (see architecture/RUNNING.md)
+export/

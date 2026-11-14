@@ -1,0 +1,5 @@
+# Build context is the repository root; the Spark image needs only these files (see infra/spark/Dockerfile).
+*
+!pyproject.toml
+!uv.lock
+!infra/spark/
