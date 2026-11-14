@@ -98,3 +98,23 @@ def test_round_keeps_its_position_when_refreshed():
 def test_round_empty():
     r = Round(50)
     assert r.next_batch() == [] and r.requests_per_round == 0
+
+
+# ------------------------------------------------------------------ event time vs the mock's replay time
+
+
+def test_after_mock_time():
+    from gametrend.ingestion.validate import after_mock_time
+
+    assert after_mock_time("2026-11-06T12:00:00.001Z", "2026-11-06T12:00:00.000Z")
+    assert not after_mock_time("2026-11-06T12:00:00.000Z", "2026-11-06T12:00:00.000Z")  # equal is allowed
+    assert not after_mock_time("2026-11-06T11:59:59.999Z", "2026-11-06T12:00:00.000Z")
+    assert after_mock_time("2026-11-06T13:00:00.000Z", "2026-11-06T13:30:00+01:00")  # offsets compared in UTC
+
+
+def test_after_mock_time_without_readable_header_keeps_the_event():
+    from gametrend.ingestion.validate import after_mock_time
+
+    assert not after_mock_time("2026-11-06T12:00:00.000Z", None)
+    assert not after_mock_time("2026-11-06T12:00:00.000Z", "")
+    assert not after_mock_time("2026-11-06T12:00:00.000Z", "garbage")

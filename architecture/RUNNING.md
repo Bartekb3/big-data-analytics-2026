@@ -22,7 +22,7 @@ How to set up, start and test the project **in its current state of implementati
 ## Setup
 
 ```
-uv sync                       # create .venv and install dependencies (without pyspark, which only the Spark image installs)
+uv sync                       # create .venv and install dependencies, with pandas for tests (without pyspark and pyarrow, which only the Spark image installs)
 cp .env.example .env          # local configuration (never commit .env)
 ```
 

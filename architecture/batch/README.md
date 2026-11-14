@@ -40,8 +40,13 @@ Package C, see [owners](../README.md#owners).
 Run in this order; a job never overlaps with itself:
 
 1. **Kafka -> Parquet sink:** Structured Streaming with the `availableNow` trigger and a checkpoint on a volume, writing the [Parquet master dataset](../contracts/parquet-master.md).
-2. **Hourly aggregates** into [`game_metrics_hourly`](../contracts/mongodb-collections.md#game_metrics_hourly), computed from Parquet with the shared functions from [common](../common/README.md), never from speed output. Only closed hours covered by the archive.
+2. **Hourly aggregates** into [`game_metrics_hourly`](../contracts/mongodb-collections.md#game_metrics_hourly), computed from Parquet with the shared functions from [common](../common/README.md#how-speed-and-batch-call-the-metric-functions), never from speed output. Only closed hours covered by the archive.
+   - For hour H, read events with observation time in `[H - 1 h, H + 1 h)`. Hour H - 1 only supplies the predecessor for `new_visits` (`last_with_visits`); its own values are not written.
+   - Per game, `applyInPandas` with nullable dtypes (`Int64` for `players` and `visits`, UTC timestamps), so a missing value never becomes a float. Rows go through `to_observation` before the metric functions.
+   - `new_visits` of the hour comes from `hourly_new_visits`, never from `F.sum`, so an hour without a valid delta stays absent.
 3. **Retention:** in ONE multi-document transaction (`session.with_transaction`), upsert the hourly documents and delete 5-minute documents older than the [retention cutoff](../common/README.md#design--rules). 5-minute documents whose hour has no hourly aggregate are kept.
+   - "Now" for the cutoff is the latest event `ts` in Parquet ([conventions § Time](../contracts/conventions.md#time)).
+   - The retention can be set shorter by configuration (e.g. 48 h for the demo, whose archive is shorter than 14 days); `retention_cutoff` refuses less than 25 h.
 4. **Training and evaluation** of both models ([ml](../ml/README.md)).
 
 ### Daily

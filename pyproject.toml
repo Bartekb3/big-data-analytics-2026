@@ -12,11 +12,18 @@ dependencies = [
 
 [project.optional-dependencies]
 spark = [
+    # pyspark 3.5 predates pandas 3 and numpy 2: keep pandas 2.2 / numpy 1.x / pyarrow < 16
+    "numpy>=1.24,<2",
+    "pandas>=2.2,<2.3",
+    "pyarrow>=12,<16",
     "pyspark==3.5.9",
 ]
 
 [dependency-groups]
 dev = [
+    # same pandas/numpy as the Spark image, so host tests see the same behaviour
+    "numpy>=1.24,<2",
+    "pandas>=2.2,<2.3",
     "pytest>=8",
 ]
 

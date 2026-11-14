@@ -189,3 +189,49 @@ def test_print_sink_writes_topic_and_json():
     PrintSink(out).send("steam.players", {"kind": "players", "id": 1}, flags.append)
     topic, payload = out.getvalue().rstrip("\n").split("\t")
     assert topic == "steam.players" and json.loads(payload) == {"kind": "players", "id": 1} and flags == [True]
+
+
+# ------------------------------------------------------------------ events later than X-Mock-Time
+
+
+def with_mock_time(body, mock_time):
+    return Result(200, body, {"X-Mock-Time": mock_time})
+
+
+def test_events_later_than_mock_time_are_dropped_and_counted():
+    p, client, sink = make()
+    items = load("roblox_games")["data"][:2]
+    body = {"data": [mocked(items[0], OBS1), mocked(items[1], OBS2)]}
+    client.script("roblox_games", with_mock_time(body, OBS1))  # OBS2 lies after the replay time
+    p.poll_batch("roblox_games", [1, 2])
+    assert {e["ts"] for _, e in sink.sent} == {OBS1}
+    assert sink.kinds() == ["game", "meta"]
+    assert p.stats.take()["roblox_games"]["dropped"] == 2  # game + meta of the future observation
+
+
+def test_dropped_future_observation_is_sent_once_it_is_no_longer_future():
+    p, client, sink = make()
+    client.script("roblox_games", with_mock_time(games_body(OBS2, n=1), OBS1),
+                  with_mock_time(games_body(OBS2, n=1), OBS2))
+    p.poll_batch("roblox_games", [1])
+    assert sink.sent == []
+    p.poll_batch("roblox_games", [1])  # not remembered as a repeat while it was dropped
+    assert sink.kinds() == ["game", "meta"]
+
+
+def test_sorts_pages_later_than_mock_time_are_dropped():
+    p, client, sink = make()
+    client.script("roblox_sorts", with_mock_time(sorts_page(OBS2, ""), OBS1),
+                  with_mock_time(sorts_page(OBS2, ""), OBS2))
+    p.sorts_cycle("us")
+    assert sink.sent == []
+    assert p.stats.take()["roblox_sorts"]["dropped"] > 0
+    p.sorts_cycle("us")  # the dropped cycle was not remembered: sent once it is no longer future
+    assert sink.sent and set(sink.kinds()) == {"sort"}
+
+
+def test_real_mode_ignores_mock_time():
+    p, client, sink = make(mode="real")
+    client.script("roblox_votes", with_mock_time(load("roblox_votes"), "2000-01-01T00:00:00.000Z"))
+    p.poll_batch("roblox_votes", [1])
+    assert sink.sent and p.stats.take()["roblox_votes"]["dropped"] == 0

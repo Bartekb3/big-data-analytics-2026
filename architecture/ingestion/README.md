@@ -50,6 +50,7 @@ One code path. Only these differ:
 |---|---|---|
 | base URLs (one setting per API group) | all the mock's URL | the real hosts |
 | event `ts` | `_mock.observed_at` of the unit | request time, from an injected clock |
+| future `ts` | an event whose `ts` is later than the `X-Mock-Time` of its answer is dropped and counted (the mock check's criterion; needed by "now" in [conventions § Time](../contracts/conventions.md#time)); a dropped observation is not remembered as a repeat | cannot happen (`ts` is the request time) |
 | IDs | `/_mock/ids` until `tracked_games` exists | `tracked_games` |
 | back-off cap | 10 s (the mock's errors end with its clock, so waiting longer only breaks the 15 s rule) | 120 s |
 

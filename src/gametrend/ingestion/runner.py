@@ -20,7 +20,7 @@ from .sink import Sink
 from .state import MetaTracker, RepeatFilter
 from .stats import Stats, format_counts
 from .schedule import Round, spacing
-from .validate import is_valid
+from .validate import after_mock_time, is_valid
 
 log = logging.getLogger(__name__)
 
@@ -58,13 +58,26 @@ class Producers:
         """Event time: the request time on the real APIs, `_mock.observed_at` (None here) in mock mode."""
         return None if self.settings.mode == "mock" else utc_iso(res.requested_at)
 
-    def emit(self, feed: str, parsed: events.Parsed, check_repeats: bool = True) -> int:
-        """Send the valid, new events of parsed observations; returns the number of events handed to the sink."""
+    def mock_time(self, res: Result) -> str | None:
+        """`X-Mock-Time` of a mock answer (the latest allowed event time); None on the real APIs."""
+        if self.settings.mode != "mock":
+            return None
+        return res.headers.get("X-Mock-Time") or res.headers.get("x-mock-time")
+
+    def emit(self, feed: str, parsed: events.Parsed, check_repeats: bool = True,
+             mock_time: str | None = None) -> int:
+        """Send the valid, new events of parsed observations; returns the number of events handed to the sink.
+
+        `mock_time`: events with a later `ts` are dropped and counted (mock mode only, see `after_mock_time`).
+        """
         platform = PLATFORM[feed]
         topic = config.TOPIC[platform]
         self.stats.add(feed, "dropped", parsed.dropped)
         sent = 0
         for obs in parsed.observations:
+            if after_mock_time(obs.ts, mock_time):
+                self.stats.add(feed, "dropped", len(obs.events))
+                continue
             if check_repeats and not self.repeats.is_new(obs.key, obs.ts):
                 continue  # repeated observation: no event, not counted
             for event in obs.events:
@@ -146,14 +159,14 @@ class Producers:
                 parsed = events.parse_roblox_votes(res.body, ts)
             else:
                 parsed = events.parse_steam_players(res.body, ids[0], ts)
-            self.emit(feed, parsed)
+            self.emit(feed, parsed, mock_time=self.mock_time(res))
         # not_found (unknown ID, Steam game without stats): no event, not an error
 
     def sorts_cycle(self, country: str) -> None:
         """All pages of the explore sorts of one country; skipped when its first page was already sent."""
         feed = "roblox_sorts"
         token, page, attempts, restarted, first_ts = "", 0, 0, False, None
-        parsed_pages: list[events.Parsed] = []
+        parsed_pages: list[tuple[events.Parsed, str | None]] = []
         while page < config.SORTS_MAX_PAGES and not self.stop.is_set():
             params = {"sessionId": self._session_id, "device": "computer", "country": country}
             if token:
@@ -184,15 +197,15 @@ class Producers:
                 first_ts = parsed.observations[0].ts if parsed.observations else None
                 if first_ts is not None and self.repeats.seen((feed, country), first_ts):
                     return  # this cycle was already sent
-            parsed_pages.append(parsed)
+            parsed_pages.append((parsed, self.mock_time(res)))
             page += 1
             token = res.body.get("nextSortsPageToken") or ""
             if not token:
                 break
-        for parsed in parsed_pages:
-            self.emit(feed, parsed, check_repeats=False)
-        if first_ts is not None:
-            self.repeats.remember((feed, country), first_ts)
+        for parsed, mock_time in parsed_pages:
+            self.emit(feed, parsed, check_repeats=False, mock_time=mock_time)
+        if first_ts is not None and not after_mock_time(first_ts, parsed_pages[0][1]):
+            self.repeats.remember((feed, country), first_ts)  # a dropped (future) cycle is not remembered
 
     def fetch_details(self) -> None:
         """appdetails for every Steam game still waiting; a 404 or an error leaves it for the next refresh."""
@@ -213,7 +226,8 @@ class Producers:
             if outcome == "not_found":
                 continue
             if outcome == "ok":
-                self.emit(feed, events.parse_steam_appdetails(res.body, appid, self.request_ts(res)))
+                self.emit(feed, events.parse_steam_appdetails(res.body, appid, self.request_ts(res)),
+                          mock_time=self.mock_time(res))
             else:
                 self.stats.add(feed, "dropped")
             with self._lock:

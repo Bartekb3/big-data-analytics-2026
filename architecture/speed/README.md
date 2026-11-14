@@ -60,7 +60,12 @@ If a newer observation already exists, the filter does not match, the upsert tri
 
 ### Scoring
 
-- Growth and `new_visits` follow the [metric definitions](../contracts/mongodb-collections.md#metric-definitions), using the shared code from [common](../common/README.md).
+- Growth and `new_visits` follow the [metric definitions](../contracts/mongodb-collections.md#metric-definitions), using the shared code from [common](../common/README.md#how-speed-and-batch-call-the-metric-functions).
+- One micro-batch can hold many buckets of one game (dozens in an accelerated replay). Speed reduces them with `latest_per_bucket` and computes them as one chain: the first bucket against MongoDB, every next one against the previous bucket of the micro-batch. Never each bucket separately against MongoDB.
+- History is read from `game_metrics` once per micro-batch, for the games in it, by `ts` (the index), with projection `{platform, id, ts, observed_at, players, visits}`:
+  - predecessor for `new_visits`: the latest document with `visits` and `ts` in `[first ts - 1 h - 5 min, first ts)` (strictly before the first bucket of the micro-batch);
+  - growth references: `ts` in `[first observed_at - h - 20 min, last observed_at - h + 15 min]` for h = 1 h, 3 h, 24 h, in one `$or` query. The extra 5 minutes cover `observed_at` lying up to 5 minutes after `ts`; the exact filter is in common.
+- MongoDB history is merged with the micro-batch buckets through `latest_per_bucket` before `growths`, so a newer version of a bucket wins.
 - Trend score (Roblox) uses the latest `expected_players` coefficients and the [cold start rule](../ml/README.md#expected-players-model-roblox-only) of that model.
 - `projection_3h` uses the latest `projection_3h` coefficients and is applied as described in [ml](../ml/README.md#3-h-projection-one-model-per-platform).
 
@@ -81,5 +86,4 @@ Commands: [RUNNING.md](../RUNNING.md#running-tests). Coverage: TBD.
 
 ## Open questions
 
-- How growth lookups read history inside a micro-batch (MongoDB reads vs Spark state). Owner B.
 - Trend score needs `genre_l1` and game age (from `created`) from [`games`](../contracts/mongodb-collections.md#games), but `games` is neither in Inputs nor listed as read by speed in the contract. Decide how speed gets them and update Inputs and the contract. Owner B with D.
