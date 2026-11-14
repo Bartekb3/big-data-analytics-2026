@@ -28,9 +28,6 @@ ENDPOINT = {
 
 MOCK_IDS_PATH = "/_mock/ids"
 
-# Kafka topic per platform (architecture/contracts/kafka-topics.md)
-TOPIC = {"roblox": "roblox.snapshots", "steam": "steam.players"}
-
 USER_AGENT = "GameTrendRadar-student-project/0.1 (ingestion)"
 
 # ------------------------------------------------------------------ pacing

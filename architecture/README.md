@@ -55,7 +55,7 @@ Single source of truth for the design of GameTrend Radar. Start here, then open 
 | [contracts/mongodb-collections.md](contracts/mongodb-collections.md) | MongoDB collections, keys, field semantics, metric definitions, writers, readers, retention | agreed |
 | **Areas** (each also owns its per-module status, design rules, code map and test coverage) | | |
 | [ingestion/README.md](ingestion/README.md) | Roblox and Steam producers | planned |
-| [speed/README.md](speed/README.md) | streaming metrics into MongoDB | planned |
+| [speed/README.md](speed/README.md) | streaming metrics into MongoDB | in-progress |
 | [batch/README.md](batch/README.md) | Parquet sink, hourly aggregates, retention, tracked set | planned |
 | [matching/README.md](matching/README.md) | daily Steam -> Roblox clone matching | planned |
 | [ml/README.md](ml/README.md) | expected-players and +3 h projection models | planned |

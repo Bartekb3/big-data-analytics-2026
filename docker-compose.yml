@@ -119,6 +119,9 @@ services:
   speed:
     <<: *spark
     command: ["python", "-m", "gametrend.speed"]
+    # The one service with a restart policy (infra/README.md): speed fails fast on a MongoDB error and
+    # resumes from its checkpoint after the restart; 5 failures in a row mean a real bug, not a hiccup.
+    restart: on-failure:5
     environment:
       <<: *spark-env
       SPARK_DRIVER_MEMORY: 1g

@@ -38,7 +38,7 @@ Running services that implement the storage side of the contracts:
 - Kafka data lives in the named volume `gametrend_kafka-data`: it survives `restart`, `kill` and `down`, and only `down -v` deletes it. `CLUSTER_ID` is stored there, so it must not change.
 - `kafka-init` runs on every `up -d`, not on `restart`. It keeps existing topics and their data, applies the contract's settings to them, and fails if a topic has a different partition count, which Kafka cannot lower.
 - A service that needs the topics uses `depends_on` on `kafka-init` with `service_completed_successfully`: Compose then starts it after `kafka-init` and not at all if `kafka-init` fails. `service_healthy` on `kafka` is not enough.
-- Nothing restarts a stopped service: there is no restart policy.
+- Nothing restarts a stopped service: there is no restart policy. One exception: `speed` has `restart: on-failure:5`. It fails fast on any MongoDB error and resumes from its checkpoint, so a short MongoDB outage during a long run or the demo heals itself instead of leaving the dashboard stale. Each attempt waits for pymongo's server selection timeout (30 s) plus the Spark start, so 5 attempts cover a few minutes; 5 failures in a row point to a real bug and show as `exited` in `docker compose ps`.
 - Kafka and MongoDB listen on localhost only and have no authentication.
 
 ### MongoDB
@@ -74,7 +74,7 @@ Running services that implement the storage side of the contracts:
 ### Disk sizing
 
 - Retention periods are defined in the contracts: [MongoDB](../contracts/mongodb-collections.md), [Kafka](../contracts/kafka-topics.md#topic-settings), [Parquet](../contracts/parquet-master.md#general).
-- The proposal estimates about 0.5M source events/day, 5-8 MB/day of Parquet. MongoDB documents and indexes, checkpoints and Kafka retention come on top; measure total disk usage during the full-stack run and record it here.
+- Event volume: about 3M events/day (about 1,640 Roblox games with a `game` event every minute, about 2.4M; Roblox `votes` about 470k; Steam about 80k). The proposal's estimate (0.5M events/day, 5-8 MB/day of Parquet) is too low and the Parquet size per day has to be measured again. MongoDB documents and indexes, checkpoints and Kafka retention come on top; measure total disk usage during the full-stack run and record it here.
 
 ## Code map
 
@@ -94,4 +94,4 @@ Manual, see [RUNNING.md](../RUNNING.md#infrastructure): the stack starts, the to
 
 ## Open questions
 
-- Restart policy for long runs (`kafka` stays down after a crash or a Docker restart). Owner A.
+- Restart policy for long runs for the other services (`kafka` stays down after a crash or a Docker restart); `speed` has one already. Owner A.

@@ -79,7 +79,7 @@ Steam `release_date.date` comes as e.g. `"Feb 26, 2025"` and must be converted t
 
 Commands: [RUNNING.md](../RUNNING.md#running-tests).
 
-Parsing and validation are tested against `api_test/responses/*.json`, which holds a recorded response of every endpoint, and against the same responses from the mock (with `_mock`).
+Parsing and validation are tested against `api_test/responses/*.json`, which holds a recorded response of every endpoint, and against the same responses from the mock (with `_mock`). The contract check itself is shared with speed and lives in [common](../common/README.md) (`gametrend.common.kafka_contract`), with its tests. Ingestion's tests and speed's tests both check the events built from the recorded payloads against it.
 
 Development, verification and the demo run against the mock; a run against the real APIs is not required (same code path, only the base URLs differ).
 

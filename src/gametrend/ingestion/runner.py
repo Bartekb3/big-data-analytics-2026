@@ -20,7 +20,8 @@ from .sink import Sink
 from .state import MetaTracker, RepeatFilter
 from .stats import Stats, format_counts
 from .schedule import Round, spacing
-from .validate import after_mock_time, is_valid
+from ..common.kafka_contract import TOPIC, is_valid
+from .validate import after_mock_time
 
 log = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ class Producers:
         `mock_time`: events with a later `ts` are dropped and counted (mock mode only, see `after_mock_time`).
         """
         platform = PLATFORM[feed]
-        topic = config.TOPIC[platform]
+        topic = TOPIC[platform]
         self.stats.add(feed, "dropped", parsed.dropped)
         sent = 0
         for obs in parsed.observations:

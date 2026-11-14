@@ -1,7 +1,7 @@
 """Pure parsing: API response body -> observations with candidate events.
 
 Field mapping: architecture/ingestion/README.md (API sources and cadence); event format:
-architecture/contracts/kafka-topics.md. Events are not validated here (see validate.py); a missing value is
+architecture/contracts/kafka-topics.md. Events are not validated here (see gametrend.common.kafka_contract); a missing value is
 an absent field, never 0 or "" (contracts/conventions.md).
 
 `request_ts` is the event time on the real APIs (request time from the injected clock). In mock mode it is

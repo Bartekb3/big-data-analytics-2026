@@ -1,5 +1,5 @@
 from gametrend.ingestion import events
-from gametrend.ingestion.validate import is_valid
+from gametrend.common.kafka_contract import is_valid
 
 from .conftest import load, mocked
 

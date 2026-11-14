@@ -8,7 +8,8 @@ How to set up, start and test the project **in its current state of implementati
 |---|---|---|
 | API investigation | yes | `python api_test/api_test.py` (standard library only, calls the real APIs, writes `api_test/responses/`) |
 | Kafka, MongoDB | yes | see [Infrastructure](#infrastructure) |
-| Spark image (`speed`, `batch` services) | image and `spark` tests yes, jobs not yet | see [Spark](#spark) |
+| Spark image (`speed`, `batch` services) | image and `spark` tests yes; speed job yes, batch job not yet | see [Spark](#spark) |
+| speed | yes (in Docker, profile `spark`) | see [Running each area](#running-each-area) |
 | mock API | yes | see [Running each area](#running-each-area) (no Docker image yet) |
 | other areas | not yet | see the [index](README.md) |
 
@@ -82,7 +83,8 @@ docker compose logs mongo-init
 
 ```
 docker compose --profile spark build      # build gametrend-spark:dev; again after a change of uv.lock or infra/spark/
-docker compose --profile spark up -d      # start speed and batch (fails until their jobs exist)
+docker compose --profile spark up -d speed   # start the speed job only
+docker compose --profile spark up -d      # start speed and batch (batch fails until its job exists)
 docker stats --no-stream                  # memory per service, against the limits in docker-compose.yml
 ```
 
@@ -105,7 +107,7 @@ docker run --rm -v gametrend_master-data:/data/master:ro -v "${PWD}/export:/out"
 | area | command | needs |
 |---|---|---|
 | ingestion | TBD | Kafka, MongoDB (`tracked_games`) |
-| speed | TBD | Kafka, MongoDB, Spark |
+| speed | `docker compose --profile spark up -d speed`, log: `docker compose logs -f speed` | Kafka, MongoDB, Spark image; events in Kafka (ingestion) |
 | batch | TBD | Kafka, MongoDB, Spark, `/data/master` volume |
 | matching | TBD | MongoDB, network (Roblox search API) |
 | ml | TBD | MongoDB, Spark |
@@ -113,6 +115,8 @@ docker run --rm -v gametrend_master-data:/data/master:ro -v "${PWD}/export:/out"
 | demo | TBD | TBD |
 | mockapi | `uv run python -m gametrend.mockapi serve --data-dir <collector data dir>` | a collector archive |
 | mockapi reference client | `uv run python -m gametrend.mockapi check --base-url http://127.0.0.1:8080 --duration 300 --data-dir <collector data dir>` | a running mock |
+
+speed: one log line per micro-batch ([speed § Micro-batch log](speed/README.md#micro-batch-log)). Optional variable `SPEED_MAX_OFFSETS_PER_TRIGGER` (set under `speed` in `docker-compose.yml`; default in [speed](speed/README.md#reading-kafka)). To process Kafka again from the start, remove the speed container and its checkpoint: `docker compose --profile spark rm -sf speed`, then `docker volume rm gametrend_speed-checkpoint` (a stopped container still holds the volume); the guarded upserts keep the existing MongoDB data correct.
 
 `serve` options (each also an environment variable, see `.env.example`): `--port` (8080), `--a0` (replay start, default the archive start), `--start` (wall-clock instant of `--a0`, default now; pass the same pair to continue after a restart), `--speed` (1), `--errors replay|off`, `--inject <p>`. `check` without `--data-dir` only measures gaps and leads; with it, it also compares every answer with the archive. Behaviour: [mockapi](mockapi/README.md#using-the-mock-from-a-producer).
 
@@ -132,7 +136,6 @@ uv run pytest -m "not spark"           # skip tests that start a local SparkSess
 docker compose run --rm --no-deps speed pytest -m spark
 ```
 
-Exit code 5 means that no `spark` tests exist yet.
 
 ## Troubleshooting
 
@@ -143,6 +146,8 @@ Exit code 5 means that no `spark` tests exist yet.
 | `produce()` raises nothing, the delivery callback gets `UNKNOWN_TOPIC_OR_PART` after 30 s | the topic does not exist (a typo, or `kafka-init` has not finished) | fix the name, or wait for `kafka-init` |
 | `kafka-init` exits with 1: `exists with a partition count other than` | a topic was created by hand or the contract changed; Kafka cannot lower the partition count | `docker compose down`, then `docker volume rm gametrend_kafka-data` deletes all Kafka data; the next start recreates the topics |
 | `kafka` exits with 1: `Invalid cluster.id` | `CLUSTER_ID` differs from the one stored in the volume | restore the old value, or delete `gametrend_kafka-data` as above |
+| `speed` is `exited` in `docker compose ps` | it failed 5 times in a row (restart policy `on-failure:5`), e.g. MongoDB or Kafka down for minutes, or a bug | read `docker compose logs speed`, fix the cause, `docker compose --profile spark up -d speed`; it resumes from its checkpoint |
+| many `rejected (older or already written)` in the speed log after a restart | the repeated micro-batch meets documents speed already wrote | nothing, this is normal ([speed § Recovery](speed/README.md#recovery)) |
 | `mongo-init` exits with 1: `IndexOptionsConflict` or `IndexKeySpecsConflict` | an index was created by hand or the contract changed | drop that index with `mongosh`, or `docker compose down`, then `docker volume rm gametrend_mongo-data` |
 | a client on this computer: `ServerSelectionTimeoutError` mentioning `mongodb:27017` | it connected with `replicaSet=rs0` and was sent the member name, which resolves only inside Docker | use `MONGO_URI` from `.env.example` (`directConnection=true`) |
 | `Failed to find data source: kafka` in a Spark container | the image was built without the connector or is outdated | `docker compose --profile spark build` |
