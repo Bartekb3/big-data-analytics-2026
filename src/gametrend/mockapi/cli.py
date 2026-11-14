@@ -7,6 +7,7 @@ import signal
 import sys
 import threading
 
+from ..collector.cli import stop_signals
 from ..collector.records import utc_iso
 from . import config
 from .archive import archive_bounds
@@ -36,7 +37,7 @@ def cmd_serve(args) -> int:
         stop.set()
         threading.Thread(target=server.shutdown, daemon=True).start()
 
-    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+    for sig in stop_signals():
         signal.signal(sig, on_signal)
 
     log.info("archive %s: %s .. %s", settings.raw_dir, utc_iso(first), utc_iso(end))

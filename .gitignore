@@ -44,3 +44,5 @@ __pycache__/
 
 # Locally collected data (collector default lives outside the repo; this guards accidents)
 data/
+gametrend-data/
+priv/

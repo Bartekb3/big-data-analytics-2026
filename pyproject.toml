@@ -5,6 +5,7 @@ description = "GameTrend Radar: real-time trend analytics for Roblox and Steam g
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "confluent-kafka>=2.5",
     "requests>=2.32",
 ]
 

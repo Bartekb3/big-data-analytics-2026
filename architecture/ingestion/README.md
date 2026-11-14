@@ -12,11 +12,11 @@ Package A, see [owners](../README.md#owners).
 
 | module | status | notes |
 |---|---|---|
-| producers service (Roblox job group) | planned | |
-| producers service (Steam job group) | planned | |
-| shared HTTP client (rate limiter, back-off) | planned | |
-| mock API mode (see [Mock and real APIs](#mock-and-real-apis)) | planned | |
-| `ingest_stats` counters | planned | |
+| producers service (Roblox job group) | in-progress | |
+| producers service (Steam job group) | in-progress | |
+| shared HTTP client (rate limiter, back-off) | in-progress | |
+| mock API mode (see [Mock and real APIs](#mock-and-real-apis)) | in-progress | |
+| `ingest_stats` counters | planned | counted and logged every minute; not written to MongoDB yet |
 
 ## Inputs
 
