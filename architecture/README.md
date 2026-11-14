@@ -51,12 +51,12 @@ Single source of truth for the design of GameTrend Radar. Start here, then open 
 | **Contracts** | | |
 | [contracts/conventions.md](contracts/conventions.md) | types, timestamps, IDs, missing values, keys | agreed |
 | [contracts/kafka-topics.md](contracts/kafka-topics.md) | Kafka topics and their settings (partitions, retention), event payloads, producers and consumers | agreed |
-| [contracts/parquet-master.md](contracts/parquet-master.md) | Parquet master dataset (location, format, content, retention), its producers and consumers | agreed (partly open) |
+| [contracts/parquet-master.md](contracts/parquet-master.md) | Parquet master dataset (location, format, content, layout, partitioning, duplicates, retention), its producers and consumers | agreed |
 | [contracts/mongodb-collections.md](contracts/mongodb-collections.md) | MongoDB collections, keys, field semantics, metric definitions, writers, readers, retention | agreed |
 | **Areas** (each also owns its per-module status, design rules, code map and test coverage) | | |
 | [ingestion/README.md](ingestion/README.md) | Roblox and Steam producers | planned |
 | [speed/README.md](speed/README.md) | streaming metrics into MongoDB | in-progress |
-| [batch/README.md](batch/README.md) | Parquet sink, hourly aggregates, retention, tracked set | planned |
+| [batch/README.md](batch/README.md) | Parquet sink, hourly aggregates, retention, tracked set | in-progress |
 | [matching/README.md](matching/README.md) | daily Steam -> Roblox clone matching | planned |
 | [ml/README.md](ml/README.md) | expected-players and +3 h projection models | planned |
 | [dashboard/README.md](dashboard/README.md) | Streamlit dashboard | planned |

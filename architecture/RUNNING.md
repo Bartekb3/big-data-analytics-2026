@@ -8,8 +8,9 @@ How to set up, start and test the project **in its current state of implementati
 |---|---|---|
 | API investigation | yes | `python api_test/api_test.py` (standard library only, calls the real APIs, writes `api_test/responses/`) |
 | Kafka, MongoDB | yes | see [Infrastructure](#infrastructure) |
-| Spark image (`speed`, `batch` services) | image and `spark` tests yes; speed job yes, batch job not yet | see [Spark](#spark) |
+| Spark image (`speed`, `batch` services) | image, `spark` tests, speed and batch jobs yes | see [Spark](#spark) |
 | speed | yes (in Docker, profile `spark`) | see [Running each area](#running-each-area) |
+| batch (sink, hourly aggregates, retention) | yes (in Docker, profile `spark`); tracked set not yet | see [Running each area](#running-each-area) |
 | mock API | yes | see [Running each area](#running-each-area) (no Docker image yet) |
 | other areas | not yet | see the [index](README.md) |
 
@@ -84,7 +85,7 @@ docker compose logs mongo-init
 ```
 docker compose --profile spark build      # build gametrend-spark:dev; again after a change of uv.lock or infra/spark/
 docker compose --profile spark up -d speed   # start the speed job only
-docker compose --profile spark up -d      # start speed and batch (batch fails until its job exists)
+docker compose --profile spark up -d      # start speed and batch
 docker stats --no-stream                  # memory per service, against the limits in docker-compose.yml
 ```
 
@@ -108,7 +109,7 @@ docker run --rm -v gametrend_master-data:/data/master:ro -v "${PWD}/export:/out"
 |---|---|---|
 | ingestion | TBD | Kafka, MongoDB (`tracked_games`) |
 | speed | `docker compose --profile spark up -d speed`, log: `docker compose logs -f speed` | Kafka, MongoDB, Spark image; events in Kafka (ingestion) |
-| batch | TBD | Kafka, MongoDB, Spark, `/data/master` volume |
+| batch | `docker compose --profile spark up -d batch`, log: `docker compose logs -f batch` | Kafka, MongoDB, Spark image, `/data/master` volume; events in Kafka (ingestion) |
 | matching | TBD | MongoDB, network (Roblox search API) |
 | ml | TBD | MongoDB, Spark |
 | dashboard | TBD | MongoDB |
@@ -117,6 +118,13 @@ docker run --rm -v gametrend_master-data:/data/master:ro -v "${PWD}/export:/out"
 | mockapi reference client | `uv run python -m gametrend.mockapi check --base-url http://127.0.0.1:8080 --duration 300 --data-dir <collector data dir>` | a running mock |
 
 speed: one log line per micro-batch ([speed § Micro-batch log](speed/README.md#micro-batch-log)). Optional variable `SPEED_MAX_OFFSETS_PER_TRIGGER` (set under `speed` in `docker-compose.yml`; default in [speed](speed/README.md#reading-kafka)). To process Kafka again from the start, remove the speed container and its checkpoint: `docker compose --profile spark rm -sf speed`, then `docker volume rm gametrend_speed-checkpoint` (a stopped container still holds the volume); the guarded upserts keep the existing MongoDB data correct.
+
+batch: one cycle every `BATCH_INTERVAL_S` seconds (sink, then hourly aggregates and the retention sweep), two log lines per cycle (`sink: ...`, `hourly: ...`); a failing step logs an ERROR in every cycle with how long it has been failing ([batch § Batch cycle](batch/README.md#batch-cycle)). Set in `.env` (Compose reads it for this service; restart with `docker compose --profile spark up -d batch` after a change):
+
+- `BATCH_INTERVAL_S` (default 3600): for an accelerated replay about 3600 / `REPLAY_SPEED`, e.g. 60 at speed 60;
+- `BATCH_RETENTION_HOURS` (default 336 = 14 days): e.g. 48 for the demo; below 25 the service refuses to start.
+
+`BATCH_MAX_OFFSETS_PER_TRIGGER` and `BATCH_RECOMPUTE_HOURS` keep their defaults ([batch](batch/README.md)); to change them, add them under `batch` in `docker-compose.yml`. To recompute every hourly aggregate from Parquet: `docker compose exec mongodb mongosh gametrend --quiet --eval "db.game_metrics_hourly.deleteMany({})"`; the next cycle starts again from the earliest event. To archive Kafka again from the start, remove the batch container and its checkpoint: `docker compose --profile spark rm -sf batch`, then `docker volume rm gametrend_archive-checkpoint`; the master dataset then holds copies, which readers drop ([parquet-master § Duplicates](contracts/parquet-master.md#duplicates)).
 
 `serve` options (each also an environment variable, see `.env.example`): `--port` (8080), `--a0` (replay start, default the archive start), `--start` (wall-clock instant of `--a0`, default now; pass the same pair to continue after a restart), `--speed` (1), `--errors replay|off`, `--inject <p>`. `check` without `--data-dir` only measures gaps and leads; with it, it also compares every answer with the archive. Behaviour: [mockapi](mockapi/README.md#using-the-mock-from-a-producer).
 
@@ -136,6 +144,8 @@ uv run pytest -m "not spark"           # skip tests that start a local SparkSess
 docker compose run --rm --no-deps speed pytest -m spark
 ```
 
+The `batch` service has the same image and mounts, so `docker compose run --rm --no-deps batch pytest -m spark tests/batch` runs only the batch tests.
+
 
 ## Troubleshooting
 
@@ -147,6 +157,9 @@ docker compose run --rm --no-deps speed pytest -m spark
 | `kafka-init` exits with 1: `exists with a partition count other than` | a topic was created by hand or the contract changed; Kafka cannot lower the partition count | `docker compose down`, then `docker volume rm gametrend_kafka-data` deletes all Kafka data; the next start recreates the topics |
 | `kafka` exits with 1: `Invalid cluster.id` | `CLUSTER_ID` differs from the one stored in the volume | restore the old value, or delete `gametrend_kafka-data` as above |
 | `speed` is `exited` in `docker compose ps` | it failed 5 times in a row (restart policy `on-failure:5`), e.g. MongoDB or Kafka down for minutes, or a bug | read `docker compose logs speed`, fix the cause, `docker compose --profile spark up -d speed`; it resumes from its checkpoint |
+| `batch` is `exited` in `docker compose ps` | its SparkSession died 5 times in a row (step failures alone do not stop it) | read `docker compose logs batch`, fix the cause, `docker compose --profile spark up -d batch`; it resumes from its checkpoint and MongoDB |
+| `ERROR ... hourly aggregates failed N cycle(s) in a row` in the batch log | one hour cannot be computed (e.g. a value the metric functions reject); aggregates stand still at that hour, the sink keeps archiving | read the traceback of the first failing cycle, fix the cause; the next cycle continues from the last written hour |
+| `kept_without_hourly=...` in the batch log | 5-minute documents older than the cutoff whose game has no hourly document for that hour (e.g. events lost in Kafka before the sink read them); they are kept on purpose | nothing; see [batch § Retention sweep](batch/README.md#retention-sweep) |
 | many `rejected (older or already written)` in the speed log after a restart | the repeated micro-batch meets documents speed already wrote | nothing, this is normal ([speed § Recovery](speed/README.md#recovery)) |
 | `mongo-init` exits with 1: `IndexOptionsConflict` or `IndexKeySpecsConflict` | an index was created by hand or the contract changed | drop that index with `mongosh`, or `docker compose down`, then `docker volume rm gametrend_mongo-data` |
 | a client on this computer: `ServerSelectionTimeoutError` mentioning `mongodb:27017` | it connected with `replicaSet=rs0` and was sent the member name, which resolves only inside Docker | use `MONGO_URI` from `.env.example` (`directConnection=true`) |

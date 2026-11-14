@@ -209,7 +209,7 @@ End-to-end check (manual): `serve` on a real archive plus `check --data-dir` aga
 ## Open questions
 
 - Resolved: "now" for every service (retention cutoff, ML evaluation, health page, daily jobs) is data time, not the replay clock or the wall clock; see [conventions § Time](../contracts/conventions.md#time).
-- Re-runs and producer restarts send exact duplicate events; the append-only Parquet dataset needs deduplication by `(platform, id, kind, ts)`, and for `sort` events also `country` and `sort` ([kafka-topics](../contracts/kafka-topics.md#robloxsnapshots)). Owner C ([batch](../batch/README.md)).
+- Resolved: re-runs and producer restarts send exact duplicate events; the Parquet master dataset keeps them and its readers handle them, see [parquet-master § Duplicates](../contracts/parquet-master.md#duplicates).
 - Producers take IDs from `/_mock/ids` now and from [`tracked_games`](../contracts/mongodb-collections.md#tracked_games) once batch builds it. Owner A with C.
 - Move the raw record format to `contracts/raw-archive.md` (the mock is its first reader). Owner E.
 - Where the mock and the pipeline run and how the archive gets there from the collecting computer (proposed: copy closed `.gz` hours, e.g. `rsync` every hour). Owner E.

@@ -7,9 +7,9 @@ Invalid records are counted and dropped; they never stop the stream.
 import json
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 
-from ..common.kafka_contract import PLATFORM_OF_TOPIC, is_valid
+from ..common.kafka_contract import PLATFORM_OF_TOPIC, is_valid, parse_date, parse_utc
 
 
 @dataclass(frozen=True)
@@ -50,16 +50,6 @@ class Parsed:
     votes: list[VotesEvent] = field(default_factory=list)
     metas: list[MetaEvent] = field(default_factory=list)
     counts: Counter = field(default_factory=Counter)  # per kind, plus "invalid"
-
-
-def parse_utc(value: str) -> datetime:
-    """Contract timestamp (`...Z`) -> aware UTC datetime. Raises ValueError on an impossible date."""
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
-
-
-def parse_date(value: str) -> datetime:
-    """Date-only value (`YYYY-MM-DD`) -> 00:00 UTC of that day (conventions § Time)."""
-    return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
 
 def _meta_fields(platform: str, event: dict) -> dict:

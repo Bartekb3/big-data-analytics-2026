@@ -138,11 +138,18 @@ services:
   batch:
     <<: *spark
     command: ["python", "-m", "gametrend.batch"]
+    # batch logs step failures and keeps cycling; it exits only when its SparkSession is dead, and then
+    # resumes from the sink checkpoint and the hourly aggregates already in MongoDB.
+    restart: on-failure:5
     environment:
       <<: *spark-env
       SPARK_DRIVER_MEMORY: 1500m
       ARCHIVE_CHECKPOINT_DIR: /data/checkpoints/archive
       MASTER_DIR: /data/master
+      # Optional, defaults in src/gametrend/batch/config.py. Accelerated replay: BATCH_INTERVAL_S ~ 3600 / speed,
+      # BATCH_RETENTION_HOURS e.g. 48 (minimum 25).
+      BATCH_INTERVAL_S: ${BATCH_INTERVAL_S:-3600}
+      BATCH_RETENTION_HOURS: ${BATCH_RETENTION_HOURS:-336}
     mem_limit: 2560m
     ports:
       - "127.0.0.1:4041:4040"    # Spark UI

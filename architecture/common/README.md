@@ -15,7 +15,7 @@ Package B, see [owners](../README.md#owners). Other areas consume it; changes in
 | metric functions (bucket, growth, `new_visits`) | in-progress | used by speed and batch |
 | history read (`read_metrics`) | planned | used by dashboard (and ml if needed) |
 | retention cutoff | in-progress | used by batch retention and history read |
-| Kafka event contract check | in-progress | used by ingestion (before sending) and speed (after reading) |
+| Kafka event contract check | in-progress | used by ingestion (before sending), speed and the batch sink (after reading) |
 
 ## Inputs
 
@@ -32,7 +32,7 @@ None (library code).
 - Metric functions take plain Python values (`int | None`, timezone-aware UTC `datetime`) and raise `ValueError` on NaN, `pd.NA`, numpy scalars or naive datetimes. Callers reading pandas or other loose sources convert explicitly with the normalisation helper first; a batch error must fail loudly, never write NaN.
 - History reads go through one function, planned as `read_metrics(platform, id, from, to)`, choosing per UTC hour: the hour's 5-minute documents from `game_metrics` if it has any, otherwise its `game_metrics_hourly` document. This does not depend on the history read and the batch retention job computing the same cutoff.
 - Retention cutoff: start of the UTC hour of "now" minus the [`game_metrics` retention](../contracts/mongodb-collections.md). "Now" is data time, passed in by the caller ([conventions § Time](../contracts/conventions.md#time)). The retention can be overridden (e.g. shorter for the demo) but never below 25 h, because speed reads `game_metrics` back 24 h + 20 min for `growth_24h`.
-- The Kafka contract check is the one implementation of the [event format](../contracts/kafka-topics.md): the producers drop what fails it, speed counts and drops it. A contract change is made there once, with the contract file.
+- The Kafka contract check is the one implementation of the [event format](../contracts/kafka-topics.md): the producers drop what fails it, speed and the batch sink count and drop it. It also gives the consumers the contract's timestamp parsing (`parse_utc`, `parse_date`) and the type of every field (`field_types()`, from which batch derives the Parquet layout). A contract change is made there once, with the contract file.
 
 ### How speed and batch call the metric functions
 
@@ -49,7 +49,7 @@ Both work on the observations of one game, in time order:
 |---|---|
 | `src/gametrend/common/metrics.py` | `Observation`; `bucket_start`, `hour_start`; `latest_per_bucket`, `last_with_visits`; `visit_delta`, `visit_deltas`, `hourly_new_visits`; `growth`, `find_reference`, `growths`; constants `BUCKET`, `MAX_VISIT_GAP`, `GROWTH_TOLERANCE`, `GROWTH_HORIZONS` |
 | `src/gametrend/common/normalize.py` | `to_python` (NaN / NaT / `pd.NA` -> None, numpy scalars -> int / float, `pd.Timestamp` -> UTC `datetime`), `to_observation`; recognises pandas and numpy without importing them |
-| `src/gametrend/common/kafka_contract.py` | `is_valid(platform, event)` (exactly the contract's fields, required ones present, types), `SCHEMA`; `TOPIC` (platform -> topic) and `PLATFORM_OF_TOPIC` |
+| `src/gametrend/common/kafka_contract.py` | `is_valid(platform, event)` (exactly the contract's fields, required ones present, types), `SCHEMA`; `field_types()` (field -> `int`, `str`, `iso`, `date`, `str_list`); `parse_utc`, `parse_date` (contract strings -> aware UTC `datetime`, `ValueError` on impossible dates); `TOPIC` (platform -> topic) and `PLATFORM_OF_TOPIC` |
 | `src/gametrend/common/retention.py` | `retention_cutoff(now, retention)`; constants `GAME_METRICS_RETENTION`, `MIN_RETENTION` |
 
 ## Tests
@@ -62,7 +62,7 @@ Commands: [RUNNING.md](../RUNNING.md#running-tests). `tests/common/`, no network
 - growth: zero and missing reference, current zero (-100), the 15 min tolerance boundary, ties, references without players skipped, references from history, from the micro-batch and from both merged;
 - normalisation: pandas and numpy missing values and scalars, a nullable `Int64` frame;
 - retention cutoff: full hour, mid hour, other retention, naive `now`, the 25 h minimum;
-- Kafka contract check: a valid event of every kind, missing, `null`, mistyped (including `bool` as integer) and extra fields, wrong timestamp formats, a kind of the other platform, non-object events, the topic maps.
+- Kafka contract check: a valid event of every kind, missing, `null`, mistyped (including `bool` as integer) and extra fields, wrong timestamp formats, a kind of the other platform, non-object events, the topic maps; `field_types` covering every field and refusing one name with two types; `parse_utc` / `parse_date` including impossible dates.
 
 ## Open questions
 

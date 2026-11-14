@@ -1,10 +1,11 @@
-"""Kafka event contract shared by the producers (ingestion) and the consumers (speed).
+"""Kafka event contract shared by the producers (ingestion) and the consumers (speed, batch sink).
 
 Fields, types and topics: architecture/contracts/kafka-topics.md. One implementation, so a contract
 change is made in one place.
 """
 
 import re
+from datetime import datetime, timezone
 
 TOPIC = {"roblox": "roblox.snapshots", "steam": "steam.players"}
 PLATFORM_OF_TOPIC = {topic: platform for platform, topic in TOPIC.items()}
@@ -63,3 +64,29 @@ def is_valid(platform: str, event: dict) -> bool:
         if name not in event or not check(event[name]):
             return False
     return all(check(event[name]) for name, check in optional.items() if name in event)
+
+
+# type tag of each check, for consumers that need a typed layout (batch: Parquet schema)
+_TYPE_TAG = {_int: "int", _str: "str", _iso: "iso", _date: "date", _str_list: "str_list"}
+
+
+def field_types() -> dict[str, str]:
+    """Every contract field -> type tag (`int`, `str`, `iso`, `date`, `str_list`), common fields first,
+    then in SCHEMA order. Raises ValueError if one name had two types in different kinds."""
+    out = {name: _TYPE_TAG[check] for name, check in COMMON.items()}
+    for required, optional in SCHEMA.values():
+        for name, check in {**required, **optional}.items():
+            tag = _TYPE_TAG[check]
+            if out.setdefault(name, tag) != tag:
+                raise ValueError(f"field {name!r} has two types: {out[name]} and {tag}")
+    return out
+
+
+def parse_utc(value: str) -> datetime:
+    """Contract timestamp (`...Z`) -> aware UTC datetime. Raises ValueError on an impossible date."""
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+
+
+def parse_date(value: str) -> datetime:
+    """Date-only value (`YYYY-MM-DD`) -> 00:00 UTC of that day (conventions § Time)."""
+    return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
