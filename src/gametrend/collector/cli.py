@@ -62,11 +62,17 @@ def run_job(name: str, ctx: feeds.Ctx, once: bool) -> None:
         ctx.clock.sleep(next_wait(job, n, ctx.clock.monotonic() - started))
 
 
+def stop_signals() -> list:
+    """Ctrl+C, kill, and terminal window closed (SIGHUP exists only on Linux and macOS)."""
+    names = ("SIGINT", "SIGTERM", "SIGHUP")
+    return [getattr(signal, n) for n in names if hasattr(signal, n)]
+
+
 def cmd_run(args) -> int:
     jobs = expand_jobs(args.jobs)
     settings = config.settings_from_env(args.data_dir)
     stop = threading.Event()
-    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):  # Ctrl+C, kill, terminal window closed
+    for sig in stop_signals():
         signal.signal(sig, lambda *_: stop.set())
 
     clock = RealClock(stop)

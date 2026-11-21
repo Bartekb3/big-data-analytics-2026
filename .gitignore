@@ -44,3 +44,7 @@ __pycache__/
 
 # Locally collected data (collector default lives outside the repo; this guards accidents)
 data/
+gametrend-data/
+priv/
+# Parquet master dataset copied out of its Docker volume (see architecture/RUNNING.md)
+export/

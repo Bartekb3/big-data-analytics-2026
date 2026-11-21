@@ -53,7 +53,7 @@ Hourly aggregates computed from the Parquet master dataset; authoritative for hi
 | `hour_ts` | Date | start of the UTC hour |
 | `players` | int | last player observation of the hour |
 | `peak_players` | int | max player observation of the hour |
-| `new_visits` | int | sum of valid visit deltas in the hour (Roblox) |
+| `new_visits` | int | sum of the valid visit deltas of the 5-minute buckets of the hour, see [metric definitions](#metric-definitions); absent when the hour has no valid delta (Roblox) |
 | `updated` | Date | last `updated` value of the hour (Roblox) |
 | `up`, `down` | Long | last non-null vote observation of the hour (Roblox) |
 
@@ -167,8 +167,10 @@ db.ingest_stats.createIndex({ feed: 1, ts: 1 }, { unique: true })
 
 Semantics of derived fields. Speed and batch must compute them identically (shared code in [common](../common/README.md)).
 
-- **Growth** (`growth_1h`, `growth_3h`, `growth_24h`): percentage change of actual player observations versus the observation 1 h / 3 h / 24 h earlier, with at most 15 minutes of lookup tolerance around the historical reference. Absent when the denominator is zero or either observation is missing. A latest player count of zero is valid.
-- **`new_visits`**: nonnegative difference between consecutive cumulative visit observations. If the counter decreases, treat it as a reset and leave the delta absent; never negative, never a sum of cumulative counters.
+- **Observations** are taken per 5-minute bucket: of several observations of a game in one bucket, the one with the latest `observed_at` counts. Equal `observed_at` is decided by the values (higher `players`, then higher `visits`, a missing value lowest), never by arrival order.
+- **Growth** (`growth_1h`, `growth_3h`, `growth_24h`): `(current - reference) / reference * 100`, where the reference is the observation with `players` whose `observed_at` is nearest to the current `observed_at` minus 1 h / 3 h / 24 h, at most 15 minutes away (the boundary included; a tie goes to the earlier observation). Absent when the reference is zero or either observation is missing. A latest player count of zero is valid (-100).
+- **`new_visits`**: nonnegative difference between the `visits` of a bucket and of its predecessor, the nearest earlier bucket with `visits`. Absent when the counter decreased (a reset), when there is no predecessor, or when the predecessor is more than 1 hour older on `observed_at` (exactly 1 hour still counts). Never negative, never a sum of cumulative counters. A delta belongs to the hour of its (later) bucket.
+- **Known limitation (`new_visits` live):** speed computes deltas in arrival order. A bucket that arrives after a later bucket of the same game (replay, restart; events of one game share a Kafka partition, so this does not happen in normal operation) makes the live value too high, and observations with equal `observed_at` are resolved by arrival order in speed. The hourly value from batch is authoritative.
 - **Trend score** (Roblox): `actual_players / max(1, exp(predicted_log1p_players) - 1)`, with the prediction from the `expected_players` model. Above/below 1 means above/below expected activity, not rising/falling; growth gives direction. Steam games have no trend score.
 - **Projection**: `projection_3h` of the latest 5-minute document.
 - **Saturation**: the number of matched Roblox games of a Steam game and their total latest players (see [dashboard](../dashboard/README.md#matched-games)).

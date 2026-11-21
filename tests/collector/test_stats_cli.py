@@ -63,3 +63,13 @@ def test_run_job_exits_quietly_when_stopped(monkeypatch, clock, stop, caplog):
     run_job("roblox-sorts", ctx, once=False)  # would loop forever if Stopped were not handled
     assert calls == [1]
     assert not [r for r in caplog.records if r.levelname == "ERROR"]
+
+
+def test_stop_signals_exist_on_this_platform():
+    import signal
+
+    from gametrend.collector.cli import stop_signals
+
+    sigs = stop_signals()
+    assert signal.SIGINT in sigs and signal.SIGTERM in sigs
+    assert (getattr(signal, "SIGHUP", None) in sigs) == hasattr(signal, "SIGHUP")  # absent on Windows

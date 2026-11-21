@@ -12,11 +12,11 @@ Package A, see [owners](../README.md#owners).
 
 | module | status | notes |
 |---|---|---|
-| producers service (Roblox job group) | planned | |
-| producers service (Steam job group) | planned | |
-| shared HTTP client (rate limiter, back-off) | planned | |
-| mock API mode (see [Mock and real APIs](#mock-and-real-apis)) | planned | |
-| `ingest_stats` counters | planned | |
+| producers service (Roblox job group) | in-progress | |
+| producers service (Steam job group) | in-progress | |
+| shared HTTP client (rate limiter, back-off) | in-progress | |
+| mock API mode (see [Mock and real APIs](#mock-and-real-apis)) | in-progress | |
+| `ingest_stats` counters | planned | counted and logged every minute; not written to MongoDB yet |
 
 ## Inputs
 
@@ -50,6 +50,7 @@ One code path. Only these differ:
 |---|---|---|
 | base URLs (one setting per API group) | all the mock's URL | the real hosts |
 | event `ts` | `_mock.observed_at` of the unit | request time, from an injected clock |
+| future `ts` | an event whose `ts` is later than the `X-Mock-Time` of its answer is dropped and counted (the mock check's criterion; needed by "now" in [conventions § Time](../contracts/conventions.md#time)); a dropped observation is not remembered as a repeat | cannot happen (`ts` is the request time) |
 | IDs | `/_mock/ids` until `tracked_games` exists | `tracked_games` |
 | back-off cap | 10 s (the mock's errors end with its clock, so waiting longer only breaks the 15 s rule) | 120 s |
 
@@ -78,13 +79,14 @@ Steam `release_date.date` comes as e.g. `"Feb 26, 2025"` and must be converted t
 
 Commands: [RUNNING.md](../RUNNING.md#running-tests).
 
-Parsing and validation are tested against `api_test/responses/*.json`, which holds a recorded response of every endpoint, and against the same responses from the mock (with `_mock`).
+Parsing and validation are tested against `api_test/responses/*.json`, which holds a recorded response of every endpoint, and against the same responses from the mock (with `_mock`). The contract check itself is shared with speed and lives in [common](../common/README.md) (`gametrend.common.kafka_contract`), with its tests. Ingestion's tests and speed's tests both check the events built from the recorded payloads against it.
+
+Development, verification and the demo run against the mock; a run against the real APIs is not required (same code path, only the base URLs differ).
 
 The mock does not react to load, so it cannot show that the limiter or the back-off work. Required before calling this area done:
 
 - limiter and back-off: unit tests with a fake clock;
 - metadata change detection: unit tests (the mock has one recorded `appdetails` per game);
-- a short run against the real APIs (tests marked `live`), to confirm the same code stays within the real limits;
 - a run against the mock with its reference client's criteria: [Checking a producer](../mockapi/README.md#checking-a-producer).
 
 ## Open questions
