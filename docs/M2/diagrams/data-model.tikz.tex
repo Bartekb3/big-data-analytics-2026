@@ -1,0 +1,30 @@
+% Conceptual data model: entities and relationships with cardinalities.
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  ent/.style={rectangle, draw=kfcgray, thick, fill=white, align=left, text width=4.0cm, inner sep=4pt},
+  rel/.style={thick, draw=kfcgray},
+  card/.style={font=\sffamily\scriptsize, fill=white, inner sep=1pt}
+]
+\node[ent] (game) at (0,0) {\textbf{Game}\\\textit{platform, id}\\Roblox universe or Steam app};
+\node[ent] (meta) at (-6.2,2.6) {\textbf{Metadata version}\\name, genres, description,\\created / released, observed\_at};
+\node[ent] (obs) at (-6.2,0) {\textbf{Player observation}\\ts, players; Roblox: visits,\\favorites, updated};
+\node[ent] (votes) at (-6.2,-2.6) {\textbf{Vote observation}\\(Roblox) ts, up, down};
+\node[ent] (sort) at (0,3.6) {\textbf{Ranking entry}\\(Roblox) ts, country, sort,\\rank, playing};
+\node[ent] (m5) at (6.2,2.6) {\textbf{5-minute metrics}\\bucket ts, players, new\_visits,\\growth, trend score, projection};
+\node[ent] (mh) at (6.2,0) {\textbf{Hourly aggregate}\\hour\_ts, players, peak\_players,\\new\_visits, up, down};
+\node[ent] (match) at (0,-3.6) {\textbf{Match}\\confidence, title\_score,\\desc\_score, matched\_at};
+\node[ent] (track) at (6.2,-2.6) {\textbf{Tracked entry}\\is\_clone\_candidate,\\poll\_minutes, best\_rank};
+\node[ent] (model) at (-6.2,-5.6) {\textbf{Model}\\expected\_players or\\projection\_3h; coeffs};
+\node[ent] (eval) at (0,-6.8) {\textbf{Model evaluation}\\MAE of model and\\two baselines, n};
+
+\draw[rel] (game) -- node[card, pos=0.2]{1} node[card, pos=0.8]{N} (meta);
+\draw[rel] (game) -- node[card, pos=0.2]{1} node[card, pos=0.8]{N} (obs);
+\draw[rel] (game) -- node[card, pos=0.2]{1} node[card, pos=0.8]{N} (votes);
+\draw[rel] (game) -- node[card, pos=0.2]{1} node[card, pos=0.8]{N} (sort);
+\draw[rel] (game) -- node[card, pos=0.2]{1} node[card, pos=0.8]{N} (m5);
+\draw[rel] (game) -- node[card, pos=0.2]{1} node[card, pos=0.8]{N} (mh);
+\draw[rel] (game) -- node[card, pos=0.2]{1} node[card, pos=0.8]{0..1} (track);
+\draw[rel] ([xshift=-1.0cm]game.south) -- node[card, pos=0.3, left]{Steam 1} node[card, pos=0.75, left]{N} ([xshift=-1.0cm]match.north);
+\draw[rel] ([xshift=1.0cm]game.south) -- node[card, pos=0.3, right]{Roblox 1} node[card, pos=0.75, right]{N} ([xshift=1.0cm]match.north);
+\draw[rel] (model) -- node[card, pos=0.2]{1} node[card, pos=0.8]{N} (eval);
+\end{tikzpicture}

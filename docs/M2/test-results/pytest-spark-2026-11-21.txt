@@ -1,0 +1,22 @@
+$ docker compose --profile spark run --rm --no-deps speed pytest -m spark -v
+=========================================================== test session starts ============================================================
+platform linux -- Python 3.11.18, pytest-9.2.0, pluggy-1.7.0 -- /opt/venv/bin/python
+rootdir: /app
+configfile: pyproject.toml
+testpaths: tests
+collected 348 items / 342 deselected / 6 selected
+
+tests/batch/test_aggregate_spark.py::test_now_earliest_and_hourly_documents PASSED                                                   [ 16%]
+tests/batch/test_aggregate_spark.py::test_replayed_copies_with_other_offsets_change_nothing PASSED                                   [ 33%]
+tests/batch/test_aggregate_spark.py::test_empty_master PASSED                                                                        [ 50%]
+tests/batch/test_sink_spark.py::test_sink_writes_partitioned_typed_rows_and_counts_invalid PASSED                                    [ 66%]
+tests/batch/test_sink_spark.py::test_second_run_writes_only_new_records PASSED                                                       [ 83%]
+tests/speed/test_job_spark.py::test_handler_on_a_spark_dataframe PASSED                                                              [100%]
+
+============================================================= warnings summary =============================================================
+tests/batch/test_aggregate_spark.py::test_now_earliest_and_hourly_documents
+  /opt/venv/lib/python3.11/site-packages/pyspark/sql/pandas/utils.py:24: DeprecationWarning: The distutils package is deprecated and slated for removal in Python 3.12. Use setuptools or check PEP 632 for potential alternatives
+    from distutils.version import LooseVersion
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================================== 6 passed, 342 deselected, 1 warning in 24.75s ===============================================

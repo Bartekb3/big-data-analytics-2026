@@ -1,0 +1,77 @@
+% Solution architecture (lambda). Implemented: solid border, tinted fill. Planned (next phases): dashed border, white fill, PLANNED tag.
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  box/.style={rectangle, rounded corners=3pt, draw=#1, fill=#1!12, thick, align=center, minimum height=1.25cm, text width=3.3cm},
+  box/.default=kfcgray,
+  db/.style={cylinder, shape border rotate=90, aspect=0.18, draw=#1, fill=#1!12, thick, align=center, minimum height=1.45cm, text width=3.0cm},
+  db/.default=kfcgray,
+  plan/.style={dashed, fill=white, text=kfcgray, line width=1.2pt},
+  tag/.style={font=\sffamily\scriptsize\bfseries, text=white, fill=kfcgray, rounded corners=2pt, inner sep=2pt, anchor=south east},
+  arr/.style={-{Stealth[length=2.6mm]}, thick, draw=kfcgray},
+  parr/.style={arr, dashed},
+  altarr/.style={arr, dotted},
+  lab/.style={font=\sffamily\scriptsize, fill=white, inner sep=1.5pt, align=center},
+  layer/.style={rectangle, rounded corners=6pt, draw=#1, fill=#1!4, thick, inner sep=10pt},
+  ltitle/.style={font=\sffamily\bfseries, text=#1, anchor=south west}
+]
+% ---------------- sources and supporting tools
+\node[box=kfcpurple] (api) at (0,4.6) {\textbf{Roblox and Steam}\\public web APIs};
+\node[box=kfcpurple] (coll) at (0,1.6) {\textbf{Collector}\\raw responses,\\original timestamps};
+\node[db=kfcpurple] (raw) at (0,-1.6) {\textbf{Raw archive}\\JSONL.gz,\\5--11 Nov 2026};
+\node[box=kfcpurple] (mock) at (0,-4.8) {\textbf{Mock API}\\archive on a\\replay clock};
+% ---------------- ingestion
+\node[box=kfcblue] (prod) at (5.6,0) {\textbf{Producers}\\(ingestion, Python)\\validation, rate limiter};
+\node[db=kfcblue] (kafka) at (10.6,0) {\textbf{Apache Kafka 3.7}\\\texttt{roblox.snapshots}\\\texttt{steam.players}};
+% ---------------- speed layer
+\node[box=kfcteal] (speed) at (16.4,4.6) {\textbf{Speed job}\\Spark Structured\\Streaming: growth,\\visit deltas};
+\node[box=kfcteal, plan] (score) at (21.4,4.6) {\textbf{Trend score,}\\\textbf{+3 h projection}\\in the speed job};
+% ---------------- batch layer
+\node[box=kfcteal] (sink) at (16.4,0) {\textbf{Parquet sink}\\Spark, \texttt{availableNow},\\hourly};
+\node[db=kfcteal] (master) at (16.4,-3.4) {\textbf{Master dataset}\\Parquet + Snappy,\\append-only};
+\node[box=kfcteal] (agg) at (21.4,-3.4) {\textbf{Hourly aggregates,}\\\textbf{retention sweep}\\Spark batch, hourly};
+\node[box=kfcteal, plan] (train) at (16.4,-6.9) {\textbf{Model training}\\Spark MLlib,\\once (6--9 Nov)};
+\node[box=kfcteal, plan] (match) at (21.4,-6.9) {\textbf{Clone matching,}\\\textbf{tracked set}\\daily};
+% ---------------- serving layer
+\node[db=kfcblue] (mongo) at (26.6,0.6) {\textbf{MongoDB 7}\\replica set \texttt{rs0}};
+\node[box=kfcblue, plan] (dash) at (26.6,-4.8) {\textbf{Dashboard}\\Streamlit + Plotly};
+
+% PLANNED tags
+\foreach \n in {score, train, match, dash} {\node[tag] at (\n.north east) {PLANNED};}
+
+% ---------------- layers
+\begin{scope}[on background layer]
+  \node[layer=kfcgray, fit=(api)(coll)(raw)(mock), label={[ltitle=kfcgray]north west:Supporting tools (outside lambda)}] {};
+  \node[layer=kfcblue, fit=(prod)(kafka), inner ysep=28pt, label={[ltitle=kfcblue]north west:Ingestion}] {};
+  \node[layer=kfcteal, fit=(speed)(score), label={[ltitle=kfcteal]north west:SPEED LAYER}] {};
+  \node[layer=kfcteal, fit=(sink)(master)(agg)(train)(match), label={[ltitle=kfcteal]north west:BATCH LAYER}] {};
+  \node[layer=kfcblue, fit=(mongo)(dash), inner xsep=14pt, label={[ltitle=kfcblue]north west:SERVING LAYER}] {};
+\end{scope}
+
+% ---------------- flows
+\draw[arr] (api) -- node[lab, right]{HTTP polling} (coll);
+\draw[arr] (coll) -- (raw);
+\draw[arr] (raw) -- (mock);
+\draw[arr] (mock.east) -- node[lab, pos=0.45, below right]{HTTP, same paths\\as the real APIs} (prod.south west);
+\draw[altarr] (api.east) -- node[lab, pos=0.45, above right]{live mode\\(implemented, not used)} (prod.north west);
+\draw[arr] (prod) -- node[lab, above]{JSON events} (kafka);
+\draw[arr] (kafka.north) |- node[lab, pos=0.75, above]{micro-batches} (speed.west);
+\draw[arr] (kafka.east) -- (sink.west);
+\draw[parr] (speed) -- (score);
+\draw[arr] (sink) -- (master);
+\draw[arr] (master) -- (agg);
+\draw[parr] (master) -- (train);
+\draw[arr] (speed.south) |- ++(0,-1.0) -| node[lab, pos=0.2, below]{5-min metrics, metadata} ([xshift=-0.7cm]mongo.north);
+\draw[parr] (score.east) -| node[lab, pos=0.3, above]{trend score, projection} ([xshift=0.7cm]mongo.north);
+\draw[arr] (agg.east) -| node[lab, pos=0.3, below]{hourly aggregates,\\deletes} ([xshift=-0.6cm]mongo.south);
+\draw[parr] (train.south) -- ++(0,-0.9) -| node[lab, pos=0.2, below]{coefficients (once)} (30.2,-1) |- (mongo.east);
+\draw[parr] (match.east) -- node[lab, above]{matches,\\tracked set} (30.2,-6.9);
+\draw[arr] (mongo) -- node[lab, right]{queries} (dash);
+
+% ---------------- legend
+\node[box, text width=2.2cm, minimum height=0.8cm, font=\sffamily\scriptsize] (l1) at (5.6,-7.4) {implemented};
+\node[box, plan, text width=2.2cm, minimum height=0.8cm, font=\sffamily\scriptsize, right=0.6cm of l1] (l2) {planned (next phases)};
+\node[tag] at (l2.north east) {PLANNED};
+\draw[arr] ([yshift=-0.9cm]l1.south west) -- node[lab, below]{implemented flow} ++(2.6,0);
+\draw[parr] ([yshift=-0.9cm]l2.south west) -- node[lab, below]{planned flow} ++(2.6,0);
+\node[font=\sffamily\bfseries, anchor=south west] at ([yshift=0.15cm]l1.north west) {Legend};
+\end{tikzpicture}

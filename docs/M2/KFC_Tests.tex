@@ -1,0 +1,163 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2cm]{geometry}
+\usepackage{microtype}
+\usepackage{booktabs,tabularx,longtable,array}
+\usepackage[table]{xcolor}
+\usepackage{float}
+\usepackage[font=small,skip=4pt]{caption}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{fancyvrb}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+
+\definecolor{kfcblue}{HTML}{185FA5}
+
+\titleformat{\section}{\large\bfseries\color{kfcblue}}{\thesection}{0.6em}{}
+\titlespacing*{\section}{0pt}{10pt}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\pagestyle{plain}
+
+\newcommand{\ep}[1]{\texttt{\small #1}}
+\newcommand{\todo}[1]{\textbf{[TODO: #1]}}
+
+% grouped test case table: group, objective, steps, expected result, actual result
+\newenvironment{testgroups}[2]{%
+  \footnotesize
+  \begin{longtable}{L{2.1cm} L{3.1cm} L{4.0cm} L{3.8cm} L{1.7cm}}
+  \caption{#1}\label{#2}\\
+  \toprule
+  \textbf{Group} & \textbf{Test objective} & \textbf{Test steps} & \textbf{Expected result} & \textbf{Actual result (passed / tests)}\\
+  \midrule\endfirsthead
+  \toprule
+  \textbf{Group} & \textbf{Test objective} & \textbf{Test steps} & \textbf{Expected result} & \textbf{Actual result}\\
+  \midrule\endhead
+}{%
+  \bottomrule
+  \end{longtable}
+}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{\fill}
+{\Huge\bfseries\color{kfcblue} GameTrend Radar\par}
+\vspace{0.4cm}
+{\Large Test documentation, Project Milestone 2\par}
+\vspace{2.5cm}
+{\Large\bfseries Team KFC\par}
+\vspace{0.5cm}
+{\large
+Bart\l{}omiej Borycki\\[3pt]
+Micha\l{} Iwaniuk\\[3pt]
+Jan Cwalina\\[3pt]
+Mi\l{}osz Choda\'n\par}
+\vspace*{\fill}
+\end{titlepage}
+
+%======================================================================
+\section{Scope}\label{sec:scope}
+We test the data acquisition modules (collector, mock API, producers) and the pre-processing modules (Kafka contract check, speed layer, Parquet sink and hourly aggregates of the batch layer). All tests are automated \ep{pytest} unit tests. They use no network and no Docker: API responses come from recorded payloads, Kafka, MongoDB and HTTP are replaced by fakes, and time comes from a fake clock. Tests that need a local Spark session run separately in the project's Spark container.
+
+The tests ran on 21~Nov 2026 with \ep{pytest} 9.2.0 and Python 3.11.18: the unit tests on Windows 11 with \ep{uv run pytest -m "not spark and not live"}, the Spark tests in the Spark container (Linux) with \ep{docker compose --profile spark run --rm --no-deps speed pytest -m spark}. Each group in Sections~\ref{sec:functional} and~\ref{sec:quality} lists how many tests it holds and how many passed; Section~\ref{sec:results} holds the log.
+
+%======================================================================
+\section{Functional tests}\label{sec:functional}
+\begin{testgroups}{Functional tests of the data acquisition and pre-processing modules.}{tab:functional}
+\multicolumn{5}{l}{\textit{Data acquisition}}\\
+Collector: HTTP and pacing & Requests respect the measured API limits; failures are retried and every attempt is archived & Send requests through the pacer on a fake clock; answer 429, 5xx, network errors and 404 & Request starts one interval apart; exponential back-off up to the cap; at most 6 retries; 404 final; every attempt one raw record & 19 / 19\\
+Collector: discovery and jobs & Jobs find the right games and poll them in batches & Run each job cycle against a fake HTTP session with recorded ranking, chart and store pages & IDs and clone candidates extracted; games polled in batches of 50; ID list merged and pruned after 7 days & 26 / 26\\
+Mock API: answers & The mock answers like the real API as of the replay time, including recorded errors & Poll a test archive at random rates; compare every answer with an independent oracle computed from the archive & Never an observation later than the replay time; stale data answered with \ep{503}; recorded error windows replayed; oracle agrees on every answer & 38 / 38\\
+Mock API: archive and polling plan & The archive is read in time order and the polling plan meets the 15\,s rule & Read hour files with merges, broken lines and late files; simulate polling at the recording rate & Records once and in order; every stream source requested at least every 15\,s; no repeats at the recording rate & 19 / 19\\
+Ingestion: parsing & Every API response becomes valid contract events & Parse the recorded response of every endpoint, in mock and live mode & Correct field mapping; \ep{ts} from \ep{\_mock.observed\_at} or request time; missing values left out; Steam 404 with \ep{result: 42} gives no event & 19 / 19\\
+Ingestion: HTTP client & Rate limiter and back-off of the producers & Send requests on a fake clock with 429, 5xx and network errors & Starts spaced by the interval; back-off doubles with jitter, capped; mock and real base URLs & 7 / 7\\
+Ingestion: producer loops & The producers send each observation once and drop what they must not send & Run the loops against fake answers: repeats, future timestamps, invalid items, failed delivery, ranking-list tokens & Only new observations sent; events later than \ep{X-Mock-Time} dropped and counted; invalid records counted; pages followed & 27 / 27\\
+\midrule
+\multicolumn{5}{l}{\textit{Pre-processing}}\\
+Contract check & Exactly the Kafka contract is accepted & Check valid events of every kind and events with missing, \ep{null}, mistyped or extra fields & Valid events pass, every deviation fails & 7 / 7\\
+Speed layer: parsing and history ranges & Kafka records become typed events; the right history is read & Parse records of both topics; compute MongoDB read ranges for normal and late events & Events built by ingestion parse without errors; \ep{sort} dropped; few, narrow history ranges & 17 / 17\\
+Speed layer: writes and micro-batch & A micro-batch ends as correct guarded upserts & Process a mixed micro-batch against a fake MongoDB; simulate rejected and failed writes; run the handler on a Spark DataFrame & One history query per platform; only fields of the event's group set; older writes rejected and counted; other errors stop the job & 16 / 16; Spark: 1 / 1\\
+Batch layer: Parquet sink & Events become rows of the master dataset & Convert events of every kind and invalid records to rows; run the sink twice on a local stream & Columns from the contract; invalid records dropped and counted; partitions by platform and date; second run writes only new records & 13 / 13; Spark: 2 / 2\\
+Batch layer: cycle and hour ranges & The batch cycle computes the right hours and isolates failures & Compute hour ranges for an empty collection, after a pause and with an open hour; fail single steps; invalid configuration & No gap after a pause; open hour skipped; a failing step does not stop the sink; invalid settings refused & 34 / 34\\
+\end{testgroups}
+
+%======================================================================
+\section{Quality tests of data transformations}\label{sec:quality}
+\begin{testgroups}{Quality tests of the data transformation processes.}{tab:quality}
+Metric functions & Buckets, visit deltas and growth follow the metric definitions & Compute them for ties, counter resets, gaps at 1\,h $\pm$ 1\,ms, zero and missing references, counters above $2^{31}$, chunked and whole sequences & Results independent of input order and chunking; no delta after a reset; growth absent for a zero reference; NaN and naive times rejected & 32 / 32\\
+Normalisation & Values from pandas never become false numbers & Convert NaN, \ep{pd.NA}, numpy scalars and nullable integer columns & Missing becomes absent, never 0; numbers exact & 4 / 4\\
+Speed scoring & Live metrics per game are correct and order-independent & Score games with many observations per bucket, exact ties, MongoDB history and newer bucket versions & One observation per bucket; newer version wins; each game uses its own history; current 0 gives $-100$\,\% & 16 / 16\\
+Hourly aggregates & Hourly documents are correct and unaffected by duplicates & Aggregate hours with peaks inside buckets, zero players, exact copies and the same key in 20 orders; run sink $\rightarrow$ Parquet $\rightarrow$ hourly on Spark & Peak over all observations; 0 kept, missing absent; copies change nothing; several hours equal one at a time & 19 / 19; Spark: 3 / 3\\
+Retention & Only data replaced by hourly aggregates is deleted & Compute cutoffs and sweep hours with and without hourly documents & Cutoff hour kept; games without an hourly document keep their 5-minute data; retention below 25\,h refused & 17 / 17\\
+Raw archive & The archive keeps responses unchanged & Rotate and compress hour files; read back plain and gzip files with a partial last line & Content identical after compression; partial line skipped; nothing overwritten & 7 / 7\\
+\end{testgroups}
+
+%======================================================================
+\section{Results}\label{sec:results}
+All 343 tests passed: 155 in data acquisition, 90 in pre-processing and 98 in quality tests. Of these, 337 are unit tests run on the host and 6 are Spark tests run in the Spark container. Five further tests call the live APIs and run only by hand.
+
+The logs below are the \ep{pytest} output; in the first one each dot is one passed test. The verbose logs with every test name are stored in the repository in \ep{docs/M2/test-results/}.
+
+\paragraph{Unit tests (host).}
+\begin{Verbatim}[fontsize=\scriptsize]
+============================= test session starts =============================
+collected 348 items / 11 deselected / 337 selected
+
+tests\batch\test_archive.py .............                                [  3%]
+tests\batch\test_config.py ............                                  [  7%]
+tests\batch\test_hourly.py ...................                           [ 13%]
+tests\batch\test_hours.py ............                                   [ 16%]
+tests\batch\test_loop.py ..........                                      [ 19%]
+tests\batch\test_mongo.py .....                                          [ 21%]
+tests\batch\test_retention.py ......                                     [ 22%]
+tests\collector\test_archive.py .......                                  [ 24%]
+tests\collector\test_extract.py .......                                  [ 27%]
+tests\collector\test_feeds.py ........                                   [ 29%]
+tests\collector\test_http.py ..............                              [ 33%]
+tests\collector\test_idlist.py .....                                     [ 35%]
+tests\collector\test_records.py .....                                    [ 36%]
+tests\collector\test_stats_cli.py ......                                 [ 38%]
+tests\common\test_kafka_contract.py .......                              [ 40%]
+tests\common\test_metrics.py ................................            [ 49%]
+tests\common\test_normalize.py ....                                      [ 51%]
+tests\common\test_retention.py ......                                    [ 52%]
+tests\ingestion\test_events.py ...................                       [ 58%]
+tests\ingestion\test_http.py .......                                     [ 60%]
+tests\ingestion\test_runner.py ..................                        [ 65%]
+tests\ingestion\test_validate_state_schedule.py .........                [ 68%]
+tests\mockapi\test_archive_clock.py ..........                           [ 71%]
+tests\mockapi\test_check.py .........                                    [ 74%]
+tests\mockapi\test_engine.py .....................                       [ 80%]
+tests\mockapi\test_robustness.py ...............                         [ 84%]
+tests\mockapi\test_verify.py ..                                          [ 85%]
+tests\speed\test_config_job.py ....                                      [ 86%]
+tests\speed\test_microbatch.py ....                                      [ 87%]
+tests\speed\test_parse.py .........                                      [ 90%]
+tests\speed\test_scoring.py ................                             [ 95%]
+tests\speed\test_windows.py ........                                     [ 97%]
+tests\speed\test_writes.py ........                                      [100%]
+
+===================== 337 passed, 11 deselected in 5.32s ======================
+\end{Verbatim}
+
+\paragraph{Spark tests (Spark container).}
+\begin{Verbatim}[fontsize=\scriptsize]
+collected 348 items / 342 deselected / 6 selected
+
+tests/batch/test_aggregate_spark.py::test_now_earliest_and_hourly_documents PASSED
+tests/batch/test_aggregate_spark.py::test_replayed_copies_with_other_offsets_change_nothing PASSED
+tests/batch/test_aggregate_spark.py::test_empty_master PASSED
+tests/batch/test_sink_spark.py::test_sink_writes_partitioned_typed_rows_and_counts_invalid PASSED
+tests/batch/test_sink_spark.py::test_second_run_writes_only_new_records PASSED
+tests/speed/test_job_spark.py::test_handler_on_a_spark_dataframe PASSED
+
+================== 6 passed, 342 deselected, 1 warning in 24.75s ==================
+\end{Verbatim}
+The warning is a deprecation notice from PySpark about the \ep{distutils} package and does not affect the results.
+
+
+\end{document}

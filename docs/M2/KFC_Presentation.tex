@@ -1,0 +1,209 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usetheme{Madrid}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{booktabs,array}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,shapes.misc,fit,backgrounds,calc}
+
+\definecolor{kfcblue}{HTML}{185FA5}
+\definecolor{kfcteal}{HTML}{0F6E56}
+\definecolor{kfcpurple}{HTML}{534AB7}
+\definecolor{kfcgray}{HTML}{5F5E5A}
+\definecolor{lightblue}{HTML}{E6F1FB}
+\definecolor{lightteal}{HTML}{E1F5EE}
+\definecolor{lightpurple}{HTML}{EEEDFE}
+\definecolor{lightgray}{HTML}{F1EFE8}
+\definecolor{lightamber}{HTML}{FAEEDA}
+
+\setbeamertemplate{navigation symbols}{}
+\renewcommand{\arraystretch}{1.25}
+\newcommand{\ep}[1]{\texttt{\small #1}}
+
+\title{GameTrend Radar}
+\subtitle{Real-time trend analytics for Roblox and Steam games\\Project Milestone 2: data acquisition and pre-processing}
+\author[Team KFC]{Bart\l{}omiej Borycki \and Micha\l{} Iwaniuk \and Jan Cwalina \and Mi\l{}osz Choda\'n}
+\institute[]{Team KFC}
+\date{}
+
+\begin{document}
+
+%----------------------------------------------------------------------
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%----------------------------------------------------------------------
+\begin{frame}{Problem and users}
+  \begin{itemize}
+    \item Roblox is driven by short trends; many mechanics come from Steam hits.
+    \item Users: Roblox developers, small studios, game-market analysts.
+    \item They ask three questions:
+    \begin{itemize}
+      \item What is rising right now?
+      \item Where did the trend come from?
+      \item How crowded is the niche?
+    \end{itemize}
+    \item We answer them with live player data from Roblox and Steam, a lambda pipeline and a dashboard.
+  \end{itemize}
+\end{frame}
+
+%----------------------------------------------------------------------
+\begin{frame}{Core use case}
+  \centering
+  \resizebox{0.92\linewidth}{!}{\input{diagrams/business-process.tikz.tex}}
+  \vspace{2mm}
+
+  \small Monitor trending Roblox games and trace their possible Steam origin.
+\end{frame}
+
+%----------------------------------------------------------------------
+\begin{frame}{Changes since Milestone 1}
+  \centering
+  \begin{tabular}{>{\bfseries}l l l}
+    \toprule
+    Topic & Milestone 1 & Milestone 2\\
+    \midrule
+    Core use case & Steam $\rightarrow$ Roblox opportunities & trending Roblox games\\
+    Data source & live APIs & recorded archive + mock API\\
+    Polling & every 5--15 min & every source $\le$ 15 s\\
+    Model training & every hour & once, on a fixed slice\\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{5mm}
+  \small Main reason: the live APIs are rate-limited, so we record once and replay.
+\end{frame}
+
+%----------------------------------------------------------------------
+\begin{frame}{Conceptual data model}
+  \centering
+  \resizebox{!}{0.82\textheight}{\input{diagrams/data-model.tikz.tex}}
+\end{frame}
+
+%----------------------------------------------------------------------
+\begin{frame}{Data sets}
+  \centering
+  \begin{tabular}{>{\bfseries}l l l}
+    \toprule
+    Feed & Content & Inflow\\
+    \midrule
+    Roblox games & players, visits, updates & every $\sim$100 s\\
+    Roblox votes & likes, dislikes & every 5 min\\
+    Roblox rankings & position per country & every 15 min\\
+    Steam players & players & every 5 min\\
+    Steam details & genre, release, description & once per game\\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{5mm}
+  \begin{itemize}
+    \item 6 days recorded (5--11 Nov 2026), JSON, $\sim$2.3M records/day.
+    \item 1,641 Roblox games with full player history.
+  \end{itemize}
+\end{frame}
+
+%----------------------------------------------------------------------
+\begin{frame}{Data quality}
+  \centering
+  \begin{tabular}{>{\bfseries}l l}
+    \toprule
+    Issue & Handling\\
+    \midrule
+    API errors ($<$0.1\%) & retry with back-off\\
+    $\sim$2 h recording gap & metric left absent\\
+    Steam game without stats & no event, never 0\\
+    Search hit not tracked (79\%) & title-only match, shown in grey\\
+    Duplicates after replays & dropped by readers\\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{5mm}
+  \small Rule everywhere: a missing value is absent, never zero.
+\end{frame}
+
+%----------------------------------------------------------------------
+\begin{frame}{Data acquisition}
+  \centering
+  \resizebox{\linewidth}{!}{%
+  \begin{tikzpicture}[font=\sffamily\small,
+    box/.style={rectangle, rounded corners=3pt, thick, align=center, minimum height=1.1cm, text width=2.2cm},
+    tool/.style={box, draw=kfcpurple, fill=kfcpurple!12},
+    ing/.style={box, draw=kfcblue, fill=kfcblue!12},
+    arr/.style={-{Stealth[length=2.4mm]}, thick, draw=kfcgray}]
+    \node[tool] (api) {Roblox and Steam APIs};
+    \node[tool, right=0.6cm of api] (col) {Collector};
+    \node[tool, right=0.6cm of col] (arc) {Raw archive};
+    \node[tool, right=0.6cm of arc] (mock) {Mock API};
+    \node[ing, right=0.6cm of mock] (prod) {Producers};
+    \node[ing, right=0.6cm of prod] (kafka) {Kafka};
+    \draw[arr] (api) -- (col); \draw[arr] (col) -- (arc); \draw[arr] (arc) -- (mock);
+    \draw[arr] (mock) -- (prod); \draw[arr] (prod) -- (kafka);
+  \end{tikzpicture}}
+
+  \vspace{6mm}
+  \begin{itemize}
+    \item Collector saves every API response unchanged, with its original time.
+    \item Mock API replays the archive like the real APIs, also faster.
+    \item Producers validate events and send them to Kafka; same code for mock and live.
+    \item Roblox limits us to about one request per 3 s.
+  \end{itemize}
+\end{frame}
+
+%----------------------------------------------------------------------
+\begin{frame}{Lambda architecture}
+  \centering
+  \resizebox{\linewidth}{!}{\input{diagrams/architecture.tikz.tex}}
+\end{frame}
+
+%----------------------------------------------------------------------
+\begin{frame}{Analytical approach}
+  \centering
+  \begin{tabular}{>{\bfseries}l l l l}
+    \toprule
+    Task & Type & Batch & Stream\\
+    \midrule
+    Growth & metrics & hourly values & every 5 min\\
+    Trend score & regression & trained once & scored live\\
+    +3 h projection & regression & trained once & projected live\\
+    Clone matching & text similarity & daily & --\\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{5mm}
+  \begin{itemize}
+    \item Models: Spark MLlib linear regression on $\log(1+\text{players})$.
+    \item Projection is compared with two baselines: ``same as now'' and ``same time yesterday''.
+    \item Results go to a Streamlit dashboard: \emph{Trending now} $\rightarrow$ game details $\rightarrow$ Steam counterpart.
+  \end{itemize}
+\end{frame}
+
+%----------------------------------------------------------------------
+\begin{frame}{Tests}
+  \centering
+  {\Huge\bfseries\color{kfcteal} 343 / 343 passed\par}
+  \vspace{6mm}
+  \begin{tabular}{>{\bfseries}l r}
+    \toprule
+    Group & Tests\\
+    \midrule
+    Data acquisition & 155\\
+    Pre-processing & 90\\
+    Quality of transformations & 98\\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{5mm}
+  \small No network, no Docker: recorded API responses and a fake clock.
+\end{frame}
+
+%----------------------------------------------------------------------
+\begin{frame}
+  \centering
+  \vspace{1cm}
+  {\Huge\bfseries\color{kfcblue} Thank you\par}
+  \vspace{8mm}
+\end{frame}
+
+\end{document}

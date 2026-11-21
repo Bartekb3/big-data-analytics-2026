@@ -1,0 +1,66 @@
+% Wireframe of the core use case: Trending now -> Roblox game details -> Steam game details.
+\begin{tikzpicture}[font=\sffamily\scriptsize,
+  frame/.style={draw=kfcgray, thick, rounded corners=3pt},
+  ph/.style={draw=kfcgray!60, fill=lightgray, rounded corners=2pt, align=center},
+  hd/.style={font=\sffamily\bfseries\small},
+  badge/.style={draw=kfcblue, fill=lightblue, text=kfcblue, rounded corners=2pt, inner sep=1.5pt, font=\sffamily\scriptsize\bfseries},
+  grey/.style={text=kfcgray!55},
+  link/.style={text=kfcblue},
+  nav/.style={-{Stealth[length=3mm]}, very thick, draw=kfcblue},
+  navlab/.style={font=\sffamily\scriptsize\bfseries, text=kfcblue, fill=white, inner sep=2pt}]
+% ================= (1) Trending now
+\draw[frame] (0,0) rectangle (11,8.6);
+\node[hd, anchor=west] at (0.3,8.15) {(1) Trending now};
+\node[ph, minimum width=1.9cm, minimum height=0.5cm] at (7.4,8.15) {Roblox | Steam};
+\node[ph, minimum width=1.6cm, minimum height=0.5cm] at (9.6,8.15) {Genre};
+\foreach \xx/\tx in {0.4/Game, 3.5/Players now, 5.2/24 h trend, 6.9/$\Delta$ 1 h, 8.1/Trend score, 9.9/+3 h} {\node[anchor=west, text=kfcgray] at (\xx,7.4) {\tx};}
+\draw[kfcgray!50] (0.3,7.15) -- (10.7,7.15);
+\foreach \yy/\nm/\rk/\pc/\dl/\sc/\pr in {6.7/Game A/\#3/58{,}000/+12\%/$\times$3.1/61k, 6.1/Game B/\#12/17{,}800/+6\%/$\times$1.9/18k, 5.5/Game C/\#1/446{,}000/+1\%/$\times$1.0/450k, 4.9/Game D/\#40/21{,}500/$-$2\%/$\times$0.4/21k} {
+  \node[anchor=west, link] at (0.4,\yy) {\nm}; \node[badge, anchor=west] at (1.6,\yy) {\rk};
+  \node[anchor=west] at (3.5,\yy) {\pc};
+  \draw[kfcteal, thick] (5.25,\yy-0.12) -- (5.6,\yy-0.05) -- (5.95,\yy+0.02) -- (6.3,\yy+0.12);
+  \node[anchor=west] at (6.9,\yy) {\dl}; \node[anchor=west] at (8.1,\yy) {\sc}; \node[anchor=west] at (9.9,\yy) {\pr};}
+\draw[kfcgray!50, dashed] (0.3,4.45) -- (10.7,4.45);
+\node[anchor=west, text=kfcgray, font=\sffamily\scriptsize\itshape] at (0.4,4.15) {No trend score yet (less than 24 h of history), ordered by $\Delta$ 1 h};
+\foreach \yy/\nm/\rk/\pc/\dl in {3.6/Game E/\#25/3{,}900/+48\%, 3.0/Game F/\#77/1{,}200/+21\%} {
+  \node[anchor=west, link] at (0.4,\yy) {\nm}; \node[badge, anchor=west] at (1.6,\yy) {\rk};
+  \node[anchor=west] at (3.5,\yy) {\pc};
+  \draw[kfcteal, thick] (5.25,\yy-0.05) -- (5.6,\yy-0.02) -- (5.95,\yy+0.05) -- (6.3,\yy+0.12);
+  \node[anchor=west] at (6.9,\yy) {\dl}; \node[anchor=west, text=kfcgray] at (8.1,\yy) {n/a}; \node[anchor=west, text=kfcgray] at (9.9,\yy) {n/a};}
+\node[ph, minimum width=10.2cm, minimum height=1.3cm, anchor=south west, text width=9.8cm] at (0.4,0.4) {Badge \textbf{\#n}: best position of the game in the Roblox ranking lists of the last 7 days\\Supplementary views: \emph{Steam$\rightarrow$Roblox opportunities}, \emph{Model and data health}};
+
+% ================= (2) Roblox game details
+\draw[frame] (12.6,0) rectangle (23.6,8.6);
+\node[hd, anchor=west] at (12.9,8.15) {(2) Roblox game details: Game A}; \node[badge, anchor=west] at (18.4,8.15) {\#3};
+\foreach \ii/\lb/\vl in {0/Players now/58{,}000, 1/Trend score/$\times$3.1, 2/+3 h projection/61k, 3/Created/date, 4/Last update/date} {
+  \node[ph, minimum width=1.95cm, minimum height=0.95cm, anchor=north west, text width=1.8cm] at (12.9+\ii*2.1,7.75) {\lb\\\textbf{\vl}};}
+\node[ph, minimum width=10.4cm, minimum height=2.4cm, anchor=north west, text width=10cm] at (12.9,6.5) {Players time series (5-min data for the last 14 days, hourly data for longer ranges)\\with update markers and the +3 h projection};
+\node[anchor=west, font=\sffamily\bfseries] at (12.9,3.6) {Possible Steam counterparts};
+\foreach \xx/\tx in {12.9/Steam game, 16.6/Released, 18.6/Players now, 20.9/Confidence} {\node[anchor=west, text=kfcgray] at (\xx,3.1) {\tx};}
+\draw[kfcgray!50] (12.8,2.85) -- (23.3,2.85);
+\node[anchor=west, link] (sx) at (12.9,2.45) {Steam game X}; \node[anchor=west] at (16.6,2.45) {date}; \node[anchor=west] at (18.6,2.45) {32{,}000}; \node[anchor=west] at (20.9,2.45) {0.87};
+\node[anchor=west, link] at (12.9,1.85) {Steam game Y}; \node[anchor=west] at (16.6,1.85) {date}; \node[anchor=west] at (18.6,1.85) {4{,}100}; \node[anchor=west] at (20.9,1.85) {0.71};
+\node[anchor=west, text=kfcgray, font=\sffamily\scriptsize\itshape] at (12.9,1.0) {Without a match: ``No Steam match found''};
+
+% ================= (3) Steam game details
+\draw[frame] (0,-7.9) rectangle (23.6,-0.8);
+\node[hd, anchor=west] at (0.3,-1.25) {(3) Steam game details: Steam game X};
+\foreach \ii/\lb/\vl in {0/Players now/32{,}000, 1/Growth 1 h/+4\%, 2/Growth 3 h/+11\%, 3/Growth 24 h/+35\%, 4/Released/date} {
+  \node[ph, minimum width=1.95cm, minimum height=0.95cm, anchor=north west, text width=1.8cm] at (0.3+\ii*2.1,-1.65) {\lb\\\textbf{\vl}};}
+\node[ph, minimum width=10.4cm, minimum height=2.6cm, anchor=north west, text width=10cm] at (0.3,-2.9) {Steam players time series\\(5-min data for the last 14 days, hourly data beyond)};
+\node[ph, fill=lightblue, minimum width=10.4cm, minimum height=1.6cm, anchor=north west, text width=10cm] at (0.3,-5.9) {Saturation: 3 possible Roblox counterparts (1 untracked),\\77{,}000 players in total};
+\node[anchor=west, font=\sffamily\bfseries] at (12.3,-1.25) {Possible Roblox counterparts};
+\foreach \xx/\tx in {12.3/Roblox game, 15.8/Players, 17.4/3 h growth, 19.1/Created, 21.3/Confidence} {\node[anchor=west, text=kfcgray] at (\xx,-1.8) {\tx};}
+\draw[kfcgray!50] (12.2,-2.05) -- (23.3,-2.05);
+\node[anchor=west, link] at (12.3,-2.45) {Game A}; \node[badge, anchor=west] at (13.5,-2.45) {\#3};
+\node[anchor=west] at (15.8,-2.45) {58{,}000}; \node[anchor=west] at (17.4,-2.45) {+12\%}; \node[anchor=west] at (19.1,-2.45) {date}; \node[anchor=west] at (21.3,-2.45) {0.87};
+\node[anchor=west, link] at (12.3,-3.05) {Game B}; \node[badge, anchor=west] at (13.5,-3.05) {\#12};
+\node[anchor=west] at (15.8,-3.05) {17{,}800}; \node[anchor=west] at (17.4,-3.05) {+9\%}; \node[anchor=west] at (19.1,-3.05) {date}; \node[anchor=west] at (21.3,-3.05) {0.82};
+\node[anchor=west, grey] at (12.3,-3.65) {Game G (untracked)};
+\node[anchor=west, grey] at (15.8,-3.65) {1{,}200*}; \node[anchor=west, grey] at (17.4,-3.65) {n/a}; \node[anchor=west, grey] at (19.1,-3.65) {n/a}; \node[anchor=west, grey] at (21.3,-3.65) {0.74};
+\node[anchor=north west, text=kfcgray, font=\sffamily\scriptsize\itshape, text width=10.8cm] at (12.3,-4.2) {Tracked games (badge) open their Roblox game details (2). * Untracked games are shown in grey: a single player count from the search result, no history and no details page.};
+
+% ================= navigation
+\draw[nav] (11.05,6.7) -- node[navlab, above, align=center]{click\\name} (12.55,6.7);
+\draw[nav] (14.0,-0.05) -- node[navlab, right]{click Steam counterpart} (14.0,-0.75);
+\end{tikzpicture}

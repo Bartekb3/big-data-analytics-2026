@@ -1,0 +1,48 @@
+% BPMN: monitor a trending Roblox game and trace its possible Steam origin.
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  task/.style={rectangle, rounded corners=4pt, draw=kfcgray, fill=white, thick, minimum height=1.25cm, align=center, text width=2.8cm},
+  start/.style={circle, draw=kfcteal, thick, minimum size=0.65cm, fill=white},
+  endev/.style={circle, draw=kfcteal, line width=2pt, minimum size=0.65cm, fill=white},
+  gw/.style={diamond, draw=kfcpurple, thick, fill=white, minimum size=0.9cm, inner sep=0pt, font=\sffamily\bfseries},
+  flow/.style={-{Stealth[length=2.6mm]}, thick, draw=kfcgray},
+  lbl/.style={font=\sffamily\scriptsize, fill=white, inner sep=2pt}
+]
+\draw[thick, kfcgray] (0,0) rectangle (25,-12);
+\draw[thick, kfcgray] (0.8,0) -- (0.8,-12);
+\node[rotate=90, font=\sffamily\bfseries] at (0.4,-6) {Developer / analyst};
+
+\node[start] (start) at (2,-2) {};
+\node[above=0.35cm of start, align=center] {Need a trend\\to follow};
+\node[task] (browse) at (5,-2) {Open \emph{Trending now}};
+\node[task] (filter) at (9,-2) {Filter Roblox games by genre};
+\node[gw] (rising) at (12,-2) {X};
+\node[above=0.4cm of rising] {Rising game?};
+\node[task] (details) at (16,-2) {Open Roblox game details};
+\node[task] (metrics) at (21,-2) {Review player history, trend score and projection};
+
+\node[gw] (linked) at (21,-6) {X};
+\node[above left=0.3cm and 0.1cm of linked, align=right] {Possible Steam\\counterpart?};
+\node[task] (steam) at (16,-6) {Review Steam game growth};
+\node[task] (others) at (11,-6) {Compare other matched Roblox games (tracked and grey)};
+\node[task] (niche) at (6,-6) {Assess how crowded the niche is};
+\node[gw] (merge) at (11,-10) {X};
+\node[task] (assess) at (16,-10) {Assess the trend using available evidence};
+\node[endev] (end) at (21,-10) {};
+\node[below=0.35cm of end, align=center] {Trend\\assessed};
+
+\draw[flow] (start) -- (browse);
+\draw[flow] (browse) -- (filter);
+\draw[flow] (filter) -- (rising);
+\draw[flow] (rising) -- node[lbl, above]{yes} (details);
+\draw[flow] (rising.south) -- (12,-3.7) -| node[lbl, pos=0.5, below]{no: refine filters} (filter.south);
+\draw[flow] (details) -- (metrics);
+\draw[flow] (metrics) -- (linked);
+\draw[flow] (linked) -- node[lbl, above]{yes} (steam);
+\draw[flow] (steam) -- (others);
+\draw[flow] (others) -- (niche);
+\draw[flow] (niche.south) |- (merge.west);
+\draw[flow] (linked.east) -- node[lbl, above]{no} (24,-6) -- (24,-8) -| node[lbl, pos=0.5, above]{Use Roblox metrics; no detected Steam origin} (merge.north);
+\draw[flow] (merge) -- (assess);
+\draw[flow] (assess) -- (end);
+\end{tikzpicture}
